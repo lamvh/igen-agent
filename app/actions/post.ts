@@ -7,13 +7,22 @@
  * - saveCaption: lưu chỉnh sửa caption + hashtags thủ công (cũng dùng khi thiếu API key).
  */
 import { revalidatePath } from "next/cache";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { idea, post, type Idea, type Post } from "@/db/schema";
+import { asset, idea, post, type Idea, type Post } from "@/db/schema";
 import { getBrand } from "@/app/actions/brand";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
+import type { PostStatus } from "@/lib/post-status";
+import type { Platform } from "@/lib/ai/prompts";
 
 export type PostView = Omit<Post, "hashtags"> & { hashtags: string[]; ideaTitle: string | null };
+
+/** Item cho danh sách tất cả post (/posts): kèm tiêu đề ý tưởng + thumbnail ảnh đầu. */
+export type PostListItem = Omit<Post, "hashtags"> & {
+  hashtags: string[];
+  ideaTitle: string | null;
+  thumbnailPath: string | null;
+};
 
 export type SaveCaptionState = { success: boolean; message: string };
 
@@ -49,6 +58,53 @@ export async function getSiblingPosts(ideaId: number): Promise<Pick<Post, "id" |
     .from(post)
     .where(eq(post.ideaId, ideaId))
     .orderBy(asc(post.id));
+}
+
+/**
+ * Tất cả post (mới nhất trước), lọc tùy chọn theo status + platform.
+ * Kèm tiêu đề ý tưởng + thumbnail (ảnh đầu) để hiện trong danh sách /posts.
+ * Phạm vi toàn DB (v1 chỉ 1 brand) — nếu sau này nhiều brand cần lọc theo brandId.
+ */
+export async function listAllPosts(filters?: {
+  status?: PostStatus;
+  platform?: Platform;
+}): Promise<PostListItem[]> {
+  const conds = [];
+  if (filters?.status) conds.push(eq(post.status, filters.status));
+  if (filters?.platform) conds.push(eq(post.platform, filters.platform));
+
+  const rows = await db
+    .select()
+    .from(post)
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(desc(post.id));
+
+  // Gom tiêu đề ý tưởng + ảnh đầu bằng 2 query inArray (tránh N+1).
+  const ideaIds = [...new Set(rows.map((r) => r.ideaId).filter((x): x is number => x != null))];
+  const firstAssetIds = rows
+    .map((r) => parseJsonArray<number>(r.assetIds)[0])
+    .filter((x): x is number => typeof x === "number");
+
+  const [ideaRows, assetRows] = await Promise.all([
+    ideaIds.length
+      ? db.select({ id: idea.id, title: idea.title }).from(idea).where(inArray(idea.id, ideaIds))
+      : Promise.resolve([]),
+    firstAssetIds.length
+      ? db.select({ id: asset.id, path: asset.path }).from(asset).where(inArray(asset.id, firstAssetIds))
+      : Promise.resolve([]),
+  ]);
+  const titleById = new Map(ideaRows.map((r) => [r.id, r.title]));
+  const pathById = new Map(assetRows.map((r) => [r.id, r.path]));
+
+  return rows.map((row) => {
+    const firstAssetId = parseJsonArray<number>(row.assetIds)[0];
+    return {
+      ...row,
+      hashtags: parseJsonArray<string>(row.hashtags),
+      ideaTitle: row.ideaId != null ? titleById.get(row.ideaId) ?? null : null,
+      thumbnailPath: typeof firstAssetId === "number" ? pathById.get(firstAssetId) ?? null : null,
+    };
+  });
 }
 
 /** Lưu chỉnh sửa caption + hashtags. useActionState: (prev, formData) với postId qua hidden field. */

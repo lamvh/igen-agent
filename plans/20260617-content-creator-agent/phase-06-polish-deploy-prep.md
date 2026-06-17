@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: "Polish & Deploy Prep"
-status: pending
+status: completed
 priority: P2
 effort: "4-6h"
 dependencies: [5]
@@ -38,10 +38,22 @@ Hoàn thiện UX, hướng dẫn cắm API key, và chuẩn bị deploy (auth + 
 6. (Optional, khi deploy) viết phase con: better-auth + R2/S3 + Postgres + `/ck:deploy`.
 
 ## Success Criteria
-- [ ] Dashboard hiện đúng số liệu
-- [ ] Settings test được key, báo trạng thái
-- [ ] README đủ để người mới chạy được app
-- [ ] App responsive, không lỗi console nghiêm trọng
+- [x] Dashboard hiện đúng số liệu (getDashboardStats; verified)
+- [x] Settings test được key, báo trạng thái (getKeyStatus + testClaudeKey)
+- [x] README đủ để người mới chạy được app (install→env→migrate→dev + bảng key)
+- [x] App responsive, không lỗi console nghiêm trọng
 
 ## Risk Assessment
-- Lưu API key trong DB/env local OK; khi deploy public phải dùng secret manager, không commit key. Mitigation: tài liệu hóa rõ trong README + `.gitignore` đã chặn `.env*`.
+- Lưu API key trong DB/env local OK; khi deploy public phải dùng secret manager, không commit key. Mitigation: tài liệu hóa rõ trong README + `.gitignore` đã chặn `.env*` (thêm `!.env.example`).
+
+## Completion Notes (Session 2026-06-17)
+- Dashboard: stats strip (ý tưởng + post theo trạng thái) + empty state khi chưa có brand + nav 5 mục.
+- Settings: trạng thái key + test Claude (lời gọi nhỏ max_tokens:8). KHÔNG nhập key qua UI (chỉ .env.local) — tránh lộ.
+- `.env.example` enrich (URL lấy key, comment); `.gitignore` thêm `!.env.example` (vẫn chặn .env.local — verified).
+- Deploy: chỉ tài liệu hóa (Postgres + R2/S3 + auth) trong README, KHÔNG implement (đúng scope optional).
+- **Fix quan trọng (build phát hiện):** các trang đọc DB/env (`/`, `/settings`, `/brand`, `/ideas`, `/assets`) bị Next prerender static → dữ liệu build-time (stale). Thêm `export const dynamic = "force-dynamic"` để render lúc request. `/calendar` + `/editor` đã dynamic sẵn (searchParams/params). Build output: mọi route data đều ƒ.
+- Fix sau code review (Low): `layout.tsx` đổi title "Create Next App" → "Content Creator" (template per-page) + `lang="vi"`; `testClaudeKey` phân biệt 401/403 (key sai) vs 429/5xx (tạm thời).
+- Verify: lint clean · build pass (mọi route dynamic) · smoke test stats counts OK.
+
+## v1 hoàn thành
+6/6 phase done. Mở rộng tương lai: sinh ảnh AI thật (Gemini), auth + Postgres + object storage để deploy public.

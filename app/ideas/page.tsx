@@ -12,13 +12,21 @@ import { CreateCaptionButton } from "./create-caption-button";
 
 export const metadata = { title: "Ý tưởng & Caption" };
 
+// Đọc brand + ý tưởng từ DB lúc request.
+export const dynamic = "force-dynamic";
+
 export default async function IdeasPage() {
   const [brand, ideas] = await Promise.all([getBrand(), listIdeas()]);
   const keyAvailable = hasApiKey();
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-bold tracking-tight">Ý tưởng & Caption</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold tracking-tight">Ý tưởng & Caption</h1>
+        <Link href="/posts" className="text-sm text-muted-foreground underline">
+          Xem nội dung đã tạo →
+        </Link>
+      </div>
       <p className="mt-1 mb-8 text-sm text-muted-foreground">
         Sinh ý tưởng nội dung rồi tạo caption riêng cho từng nền tảng.
       </p>

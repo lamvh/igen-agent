@@ -9,6 +9,9 @@ export const metadata = {
   title: "Brand Profile",
 };
 
+// Đọc brand từ DB lúc request.
+export const dynamic = "force-dynamic";
+
 export default async function BrandPage() {
   const brand = await getBrand();
 

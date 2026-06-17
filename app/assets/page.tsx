@@ -9,6 +9,9 @@ import { UploadForm } from "./upload-form";
 
 export const metadata = { title: "Thư viện ảnh" };
 
+// Đọc danh sách ảnh + trạng thái key lúc request.
+export const dynamic = "force-dynamic";
+
 export default async function AssetsPage() {
   const [assets, geminiKey] = await Promise.all([listAssets(), Promise.resolve(hasGeminiKey())]);
 

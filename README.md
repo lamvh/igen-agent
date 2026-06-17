@@ -13,18 +13,19 @@ Web app sinh nội dung + quản lý lịch đăng cho **1 thương hiệu** (ti
 
 ```bash
 npm install
-npm run db:migrate   # tạo local.db + bảng
-npm run dev          # http://localhost:3000
+cp .env.example .env.local   # rồi điền key (xem bên dưới)
+npm run db:migrate           # tạo local.db + bảng
+npm run dev                  # http://localhost:3000
 ```
 
-Cấu hình qua `.env.local`:
+### Lấy API key
 
-```
-DATABASE_URL=file:./local.db   # mặc định nếu bỏ trống
-ANTHROPIC_API_KEY=             # để trống nếu chưa có; sinh AI sẽ tắt
-```
+| Biến | Dùng cho | Lấy tại |
+|------|----------|---------|
+| `ANTHROPIC_API_KEY` | Sinh ý tưởng + caption (Claude) | https://console.anthropic.com |
+| `GEMINI_API_KEY` | Sinh ảnh AI (sắp có) | https://aistudio.google.com |
 
-> Đặt `ANTHROPIC_API_KEY` rồi khởi động lại dev server để bật sinh ý tưởng/caption.
+Để trống cũng được — app vẫn chạy, chỉ ẩn nút sinh tự động (vẫn nhập/sửa thủ công). Sau khi điền key, **khởi động lại dev server**. Kiểm tra trạng thái + test key tại trang **Cài đặt** (`/settings`).
 
 ## Scripts
 
@@ -60,6 +61,14 @@ Sinh nội dung bằng Claude (`claude-opus-4-8`), dùng ngữ cảnh từ Brand
 - Output dùng **structured outputs** (zod) nên parse an toàn, không lo JSON hỏng.
 - Thiếu `ANTHROPIC_API_KEY`: ẩn nút sinh, vẫn nhập caption thủ công được.
 
+### Nội dung (`/posts`)
+
+Xem **mọi caption đã tạo, gồm bản nháp** (không cần lên lịch mới thấy):
+
+- Danh sách phẳng, mới nhất trước; mỗi mục có badge nền tảng + trạng thái, snippet caption, thumbnail, ngày đăng (nếu có).
+- Lọc theo trạng thái (Nháp / Đã lên lịch / Đã đăng) và nền tảng.
+- Click mở trình soạn để sửa/lên lịch/gắn ảnh.
+
 ### Soạn caption (`/editor/[postId]`)
 
 Sửa caption + hashtags của một bản nháp; chuyển nhanh giữa các nền tảng cùng ý tưởng; **gán ngày đăng** (đặt trạng thái “Đã lên lịch”); lưu thủ công (cũng dùng khi không có API key). Tất cả lời gọi Claude chạy ở server action — API key không bao giờ lộ ra client.
@@ -84,13 +93,21 @@ Quản lý ảnh để gắn vào bài đăng (local-first):
 - Trong trình soạn caption: chọn ảnh từ thư viện để **gắn/bỏ gắn** vào post (toggle), ảnh đầu hiện làm thumbnail trên lịch.
 - **Sinh ảnh AI** (Gemini/Nano Banana): nút khai báo sẵn nhưng **disable** cho tới khi có `GEMINI_API_KEY` (hint lấy key tại aistudio.google.com).
 
-> Ảnh upload không được commit (gitignore `public/uploads/*`). Khi deploy serverless cần chuyển sang object storage (R2/S3) — xem Phase 6.
+> Ảnh upload không được commit (gitignore `public/uploads/*`). Khi deploy serverless cần chuyển sang object storage (R2/S3) — xem mục Deploy.
+
+### Dashboard (`/`) & Cài đặt (`/settings`)
+
+- **Dashboard**: số liệu nhanh (số ý tưởng, post theo trạng thái nháp/đã lên lịch/đã đăng) + điều hướng tới mọi mục; empty state khi chưa có brand.
+- **Cài đặt**: xem trạng thái `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` và **test** key Claude bằng một lời gọi nhỏ. Không nhập key qua UI (tránh lộ) — cấu hình trong `.env.local`.
 
 ## Cấu trúc thư mục
 
 ```
 app/
-  page.tsx                 # dashboard
+  page.tsx                 # dashboard (số liệu + điều hướng)
+  settings/
+    page.tsx               # cài đặt: trạng thái key (Server Component)
+    claude-test-button.tsx # test key Claude (Client)
   brand/                   # Brand Profile (page + form)
   ideas/
     page.tsx               # Idea generator + danh sách (Server Component)
@@ -101,6 +118,8 @@ app/
     caption-editor.tsx     # form sửa caption (Client)
     schedule-control.tsx   # gán ngày đăng (Client)
     asset-picker.tsx       # chọn/gắn ảnh từ thư viện (Client)
+  posts/
+    page.tsx               # danh sách mọi post + lọc trạng thái/nền tảng (Server Component)
   calendar/
     page.tsx               # lịch tháng + lọc nền tảng (Server Component)
   assets/
@@ -109,9 +128,11 @@ app/
   actions/
     brand.ts               # getBrand, upsertBrand
     generate.ts            # generateIdeas, generateCaption (gọi Claude)
-    post.ts                # listIdeas, getPost, getSiblingPosts, saveCaption
+    post.ts                # listIdeas, getPost, getSiblingPosts, listAllPosts, saveCaption
     calendar.ts            # listScheduledPosts, updatePostSchedule, updatePostStatus
     asset.ts               # uploadAsset, listAssets, attachAssetToPost
+    stats.ts               # getDashboardStats
+    settings.ts            # getKeyStatus, testClaudeKey
 components/calendar/
   month-grid.tsx           # lưới tháng (Server Component)
   post-card.tsx            # thẻ post: thumbnail + badge + đổi trạng thái + copy (Client)
@@ -133,6 +154,16 @@ components/ui/             # shadcn components
 drizzle/                   # file migration sinh ra
 ```
 
+## Deploy (chuẩn bị)
+
+App là **local-first**; deploy public cần ba việc (chưa làm — scaffold khi quyết định deploy):
+
+1. **Database**: SQLite → Postgres. Đổi Drizzle driver + `DATABASE_URL` (connection string Postgres).
+2. **Lưu ảnh**: `public/uploads/` không bền trên serverless (filesystem ephemeral) → chuyển object storage (Cloudflare R2 / S3). Sửa `uploadAsset` ghi lên bucket, lưu URL vào `asset.path`.
+3. **Auth**: thêm đăng nhập (vd Better Auth email/password) trước khi mở public — v1 chưa có auth.
+
+**Bảo mật:** không commit key thật. `.env.local` đã được `.gitignore`; khi deploy dùng secret manager của nền tảng, không hardcode.
+
 ## Lộ trình
 
-Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile), Phase 3 (sinh nội dung AI), Phase 4 (lịch nội dung), Phase 5 (thư viện ảnh). Tiếp theo: Phase 6 (polish & deploy prep).
+Xem `plans/20260617-content-creator-agent/plan.md`. **Hoàn thành v1:** Phase 1 (setup) · Phase 2 (Brand Profile) · Phase 3 (sinh nội dung AI) · Phase 4 (lịch nội dung) · Phase 5 (thư viện ảnh) · Phase 6 (polish & deploy prep). Mở rộng sau: sinh ảnh AI (Gemini), auth + Postgres + object storage để deploy.
