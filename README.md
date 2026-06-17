@@ -62,7 +62,17 @@ Sinh nội dung bằng Claude (`claude-opus-4-8`), dùng ngữ cảnh từ Brand
 
 ### Soạn caption (`/editor/[postId]`)
 
-Sửa caption + hashtags của một bản nháp; chuyển nhanh giữa các nền tảng cùng ý tưởng; lưu thủ công (cũng dùng khi không có API key). Tất cả lời gọi Claude chạy ở server action — API key không bao giờ lộ ra client.
+Sửa caption + hashtags của một bản nháp; chuyển nhanh giữa các nền tảng cùng ý tưởng; **gán ngày đăng** (đặt trạng thái “Đã lên lịch”); lưu thủ công (cũng dùng khi không có API key). Tất cả lời gọi Claude chạy ở server action — API key không bao giờ lộ ra client.
+
+### Lịch nội dung (`/calendar`)
+
+Lịch tháng xếp các post theo `scheduledDate`:
+
+- Điều hướng tháng (←/→), lọc theo nền tảng (FB/IG/TikTok/tất cả).
+- Mỗi post hiện badge nền tảng + trạng thái, snippet caption (click mở editor).
+- Đổi trạng thái ngay trên thẻ (Nháp → Đã lên lịch → Đã đăng).
+- Nút **Copy** ghép caption + hashtags vào clipboard để đăng thủ công (không auto-post).
+- Ngày dùng giờ local nhất quán (không lệch timezone).
 
 ## Cấu trúc thư mục
 
@@ -77,16 +87,25 @@ app/
   editor/[postId]/
     page.tsx               # caption editor (Server Component)
     caption-editor.tsx     # form sửa caption (Client)
+    schedule-control.tsx   # gán ngày đăng (Client)
+  calendar/
+    page.tsx               # lịch tháng + lọc nền tảng (Server Component)
   actions/
     brand.ts               # getBrand, upsertBrand
     generate.ts            # generateIdeas, generateCaption (gọi Claude)
     post.ts                # listIdeas, getPost, getSiblingPosts, saveCaption
+    calendar.ts            # listScheduledPosts, updatePostSchedule, updatePostStatus
+components/calendar/
+  month-grid.tsx           # lưới tháng (Server Component)
+  post-card.tsx            # thẻ post: badge + đổi trạng thái + copy (Client)
 db/
   schema.ts                # Drizzle schema (brand, idea, post, asset)
   index.ts                 # Drizzle client (better-sqlite3)
   migrate.ts               # chạy migration
 lib/
   json.ts                  # serialize/parse JSON text (pillars, hashtags...)
+  date.ts                  # helper ngày local + lưới tháng
+  post-status.ts           # hằng số + kiểu trạng thái/calendar (client dùng được)
   ai/
     claude-client.ts       # Anthropic client + hasApiKey + model id
     prompts.ts             # prompt VN + quy tắc nền tảng
@@ -97,4 +116,4 @@ drizzle/                   # file migration sinh ra
 
 ## Lộ trình
 
-Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile), Phase 3 (sinh nội dung AI). Tiếp theo: Phase 4 (lịch đăng).
+Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile), Phase 3 (sinh nội dung AI), Phase 4 (lịch nội dung). Tiếp theo: Phase 5 (thư viện ảnh).

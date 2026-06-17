@@ -9,7 +9,7 @@ export default function Home() {
         Sinh nội dung + quản lý lịch đăng cho thương hiệu của bạn.
       </p>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Link href="/brand" className="block transition-opacity hover:opacity-80">
           <Card>
             <CardHeader>
@@ -26,6 +26,15 @@ export default function Home() {
               <CardDescription>Sinh nội dung bằng AI</CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">Bắt đầu sinh →</CardContent>
+          </Card>
+        </Link>
+        <Link href="/calendar" className="block transition-opacity hover:opacity-80">
+          <Card>
+            <CardHeader>
+              <CardTitle>Lịch nội dung</CardTitle>
+              <CardDescription>Xếp lịch đăng theo nền tảng</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">Xem lịch →</CardContent>
           </Card>
         </Link>
       </div>

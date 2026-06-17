@@ -6,7 +6,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPost, getSiblingPosts } from "@/app/actions/post";
 import { PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
+import { toDateInputValue } from "@/lib/date";
 import { CaptionEditor } from "./caption-editor";
+import { ScheduleControl } from "./schedule-control";
 
 export const metadata = { title: "Soạn caption" };
 
@@ -49,8 +51,12 @@ export default async function EditorPage({ params }: { params: Promise<{ postId:
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <CaptionEditor post={post} />
+        <ScheduleControl
+          postId={post.id}
+          initialDate={toDateInputValue(post.scheduledDate ? new Date(post.scheduledDate) : null)}
+        />
       </div>
     </main>
   );
