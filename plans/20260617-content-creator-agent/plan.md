@@ -32,7 +32,7 @@ Web app sinh content + quản lý lịch đăng cho **1 thương hiệu kinh doa
 | 2 | [Brand Profile](./phase-02-brand-profile.md) | Completed |
 | 3 | [AI Text Generation](./phase-03-ai-text-generation.md) | Completed |
 | 4 | [Content Calendar](./phase-04-content-calendar.md) | Completed |
-| 5 | [Asset Library](./phase-05-asset-library.md) | Pending |
+| 5 | [Asset Library](./phase-05-asset-library.md) | Completed |
 | 6 | [Polish & Deploy Prep](./phase-06-polish-deploy-prep.md) | Pending |
 
 ## Dependencies

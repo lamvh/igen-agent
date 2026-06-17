@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  experimental: {
+    // Cho phép upload ảnh tới 5MB qua server action (mặc định Next là 1MB).
+    serverActions: {
+      bodySizeLimit: "6mb",
+    },
+  },
 };
 
 export default nextConfig;

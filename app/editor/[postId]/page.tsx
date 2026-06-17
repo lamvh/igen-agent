@@ -5,10 +5,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPost, getSiblingPosts } from "@/app/actions/post";
+import { listAssets } from "@/app/actions/asset";
 import { PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
 import { toDateInputValue } from "@/lib/date";
+import { parseJsonArray } from "@/lib/json";
 import { CaptionEditor } from "./caption-editor";
 import { ScheduleControl } from "./schedule-control";
+import { AssetPicker } from "./asset-picker";
 
 export const metadata = { title: "Soạn caption" };
 
@@ -20,7 +23,11 @@ export default async function EditorPage({ params }: { params: Promise<{ postId:
   const post = await getPost(id);
   if (!post) notFound();
 
-  const siblings = post.ideaId ? await getSiblingPosts(post.ideaId) : [];
+  const [siblings, assets] = await Promise.all([
+    post.ideaId ? getSiblingPosts(post.ideaId) : Promise.resolve([]),
+    listAssets(),
+  ]);
+  const attachedIds = parseJsonArray<number>(post.assetIds);
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -57,6 +64,7 @@ export default async function EditorPage({ params }: { params: Promise<{ postId:
           postId={post.id}
           initialDate={toDateInputValue(post.scheduledDate ? new Date(post.scheduledDate) : null)}
         />
+        <AssetPicker postId={post.id} assets={assets} attachedIds={attachedIds} />
       </div>
     </main>
   );

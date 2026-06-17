@@ -6,6 +6,7 @@
  */
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Check, Copy } from "lucide-react";
 import { PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
 import { updatePostStatus } from "@/app/actions/calendar";
@@ -66,6 +67,19 @@ export function PostCard({ post }: { post: CalendarPost }) {
           {STATUS_LABEL[post.status as PostStatus] ?? post.status}
         </span>
       </div>
+
+      {post.thumbnailPath && (
+        <div className="relative mt-1 h-12 w-full overflow-hidden rounded">
+          <Image
+            src={post.thumbnailPath}
+            alt=""
+            fill
+            sizes="120px"
+            className="object-cover"
+            unoptimized
+          />
+        </div>
+      )}
 
       <Link
         href={`/editor/${post.id}`}

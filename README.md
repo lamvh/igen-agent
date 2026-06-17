@@ -72,7 +72,19 @@ Lịch tháng xếp các post theo `scheduledDate`:
 - Mỗi post hiện badge nền tảng + trạng thái, snippet caption (click mở editor).
 - Đổi trạng thái ngay trên thẻ (Nháp → Đã lên lịch → Đã đăng).
 - Nút **Copy** ghép caption + hashtags vào clipboard để đăng thủ công (không auto-post).
+- Thẻ post hiện thumbnail ảnh đính kèm (nếu có).
 - Ngày dùng giờ local nhất quán (không lệch timezone).
+
+### Thư viện ảnh (`/assets`)
+
+Quản lý ảnh để gắn vào bài đăng (local-first):
+
+- **Upload ảnh** (PNG/JPG/WebP/GIF, ≤5MB) → lưu vào `public/uploads/`, tạo bản ghi `asset`.
+- Grid xem toàn bộ ảnh đã tải.
+- Trong trình soạn caption: chọn ảnh từ thư viện để **gắn/bỏ gắn** vào post (toggle), ảnh đầu hiện làm thumbnail trên lịch.
+- **Sinh ảnh AI** (Gemini/Nano Banana): nút khai báo sẵn nhưng **disable** cho tới khi có `GEMINI_API_KEY` (hint lấy key tại aistudio.google.com).
+
+> Ảnh upload không được commit (gitignore `public/uploads/*`). Khi deploy serverless cần chuyển sang object storage (R2/S3) — xem Phase 6.
 
 ## Cấu trúc thư mục
 
@@ -88,16 +100,22 @@ app/
     page.tsx               # caption editor (Server Component)
     caption-editor.tsx     # form sửa caption (Client)
     schedule-control.tsx   # gán ngày đăng (Client)
+    asset-picker.tsx       # chọn/gắn ảnh từ thư viện (Client)
   calendar/
     page.tsx               # lịch tháng + lọc nền tảng (Server Component)
+  assets/
+    page.tsx               # thư viện ảnh (Server Component)
+    upload-form.tsx        # form upload + nút sinh AI (Client)
   actions/
     brand.ts               # getBrand, upsertBrand
     generate.ts            # generateIdeas, generateCaption (gọi Claude)
     post.ts                # listIdeas, getPost, getSiblingPosts, saveCaption
     calendar.ts            # listScheduledPosts, updatePostSchedule, updatePostStatus
+    asset.ts               # uploadAsset, listAssets, attachAssetToPost
 components/calendar/
   month-grid.tsx           # lưới tháng (Server Component)
-  post-card.tsx            # thẻ post: badge + đổi trạng thái + copy (Client)
+  post-card.tsx            # thẻ post: thumbnail + badge + đổi trạng thái + copy (Client)
+public/uploads/            # ảnh upload (gitignore nội dung)
 db/
   schema.ts                # Drizzle schema (brand, idea, post, asset)
   index.ts                 # Drizzle client (better-sqlite3)
@@ -109,6 +127,7 @@ lib/
   ai/
     claude-client.ts       # Anthropic client + hasApiKey + model id
     prompts.ts             # prompt VN + quy tắc nền tảng
+    gemini-client.ts       # stub sinh ảnh + hasGeminiKey (gate)
   validations/             # zod schema (brand, generate)
 components/ui/             # shadcn components
 drizzle/                   # file migration sinh ra
@@ -116,4 +135,4 @@ drizzle/                   # file migration sinh ra
 
 ## Lộ trình
 
-Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile), Phase 3 (sinh nội dung AI), Phase 4 (lịch nội dung). Tiếp theo: Phase 5 (thư viện ảnh).
+Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile), Phase 3 (sinh nội dung AI), Phase 4 (lịch nội dung), Phase 5 (thư viện ảnh). Tiếp theo: Phase 6 (polish & deploy prep).

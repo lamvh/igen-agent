@@ -37,6 +37,15 @@ export default function Home() {
             <CardContent className="text-sm text-muted-foreground">Xem lịch →</CardContent>
           </Card>
         </Link>
+        <Link href="/assets" className="block transition-opacity hover:opacity-80">
+          <Card>
+            <CardHeader>
+              <CardTitle>Thư viện ảnh</CardTitle>
+              <CardDescription>Upload ảnh, gắn vào bài</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">Mở thư viện →</CardContent>
+          </Card>
+        </Link>
       </div>
     </main>
   );
