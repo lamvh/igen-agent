@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Content Creator Web App
 
-## Getting Started
+Web app sinh nội dung + quản lý lịch đăng cho **1 thương hiệu** (tiếng Việt). Sinh caption/bài + ý tưởng bằng Claude API, upload ảnh thủ công, hỗ trợ Facebook / Instagram / TikTok. Đăng thủ công (không auto-post). Local-first.
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router) · SQLite + Drizzle ORM · Tailwind + shadcn/ui · zod · Claude API (Phase 3).
+
+## Yêu cầu
+
+- Node 18+
+- (Phase 3) `ANTHROPIC_API_KEY` — chưa cần ở Phase 2
+
+## Bắt đầu
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run db:migrate   # tạo local.db + bảng
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Cấu hình DB qua `.env.local` (mặc định nếu bỏ trống):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+DATABASE_URL=file:./local.db
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Script | Mô tả |
+|--------|-------|
+| `npm run dev` | Chạy dev server |
+| `npm run build` | Build production |
+| `npm run lint` | ESLint |
+| `npm run db:generate` | Sinh file migration từ `db/schema.ts` |
+| `npm run db:migrate` | Áp dụng migration → `local.db` |
 
-To learn more about Next.js, take a look at the following resources:
+> **Lưu ý:** Sau khi sửa `db/schema.ts`, chạy `db:generate` rồi `db:migrate`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tính năng
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Brand Profile (`/brand`)
 
-## Deploy on Vercel
+Thiết lập 1 thương hiệu — đầu vào ngữ cảnh cho mọi phần sinh nội dung sau:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Tên thương hiệu *(bắt buộc)*, Ngành *(bắt buộc)*
+- Sản phẩm / dịch vụ, Tông giọng, Đối tượng khách hàng
+- **Content pillars**: danh sách động (thêm/xóa từng mục)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Cơ chế single-brand: lần đầu là form tạo; sau đó là form sửa. Validate phía server bằng zod (báo lỗi khi thiếu tên/ngành). Truy cập từ trang chủ hoặc trực tiếp `/brand`.
+
+## Cấu trúc thư mục
+
+```
+app/
+  page.tsx              # dashboard
+  brand/
+    page.tsx            # trang Brand Profile (Server Component)
+    brand-form.tsx      # form CRUD (Client Component)
+  actions/
+    brand.ts            # server actions: getBrand, upsertBrand
+db/
+  schema.ts             # Drizzle schema (brand, idea, post, asset)
+  index.ts              # Drizzle client (better-sqlite3)
+  migrate.ts            # chạy migration
+lib/
+  json.ts              # serialize/parse JSON text (pillars, hashtags...)
+  validations/brand.ts  # zod schema cho brand
+components/ui/          # shadcn components
+drizzle/                # file migration sinh ra
+```
+
+## Lộ trình
+
+Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile). Tiếp theo: Phase 3 (sinh nội dung AI).

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Home() {
@@ -9,13 +10,15 @@ export default function Home() {
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Brand Profile</CardTitle>
-            <CardDescription>Thiết lập thương hiệu (Phase 2)</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Sắp có</CardContent>
-        </Card>
+        <Link href="/brand" className="block transition-opacity hover:opacity-80">
+          <Card>
+            <CardHeader>
+              <CardTitle>Brand Profile</CardTitle>
+              <CardDescription>Thiết lập thương hiệu</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">Thiết lập ngay →</CardContent>
+          </Card>
+        </Link>
         <Card>
           <CardHeader>
             <CardTitle>Ý tưởng & Caption</CardTitle>
