@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "AI Text Generation"
-status: pending
+status: completed
 priority: P1
 effort: "6-8h"
 dependencies: [2]
@@ -45,12 +45,28 @@ app/editor/[postId]/page.tsx# caption editor
 8. Xử lý thiếu key: ẩn nút generate, hiện hint cắm key + cho nhập tay.
 
 ## Success Criteria
-- [ ] Sinh được >=5 ý tưởng VN theo pillar, lưu DB
-- [ ] Sinh caption khác nhau cho FB/IG/TikTok từ cùng 1 ý tưởng
-- [ ] Sửa + lưu caption thành công
-- [ ] Thiếu ANTHROPIC_API_KEY app không crash, cho nhập tay
+- [x] Sinh được >=5 ý tưởng VN theo pillar, lưu DB (IDEA_COUNT=6)
+- [x] Sinh caption khác nhau cho FB/IG/TikTok từ cùng 1 ý tưởng (3 prompt riêng theo PLATFORM_RULES)
+- [x] Sửa + lưu caption thành công (saveCaption)
+- [x] Thiếu ANTHROPIC_API_KEY app không crash, cho nhập tay (hasApiKey gate + editor không cần key)
 
 ## Risk Assessment
-- Output Claude không đúng JSON → dùng prompt yêu cầu JSON + parse phòng thủ (try/catch, fallback text). 
-- Chi phí token → Opus đắt hơn; giới hạn max_tokens hợp lý, không sinh batch lớn không cần thiết.
-- Key lộ → chỉ gọi Claude ở server action, không bao giờ client-side.
+- Output Claude không đúng JSON → dùng **structured outputs** (`messages.parse` + `zodOutputFormat`) thay vì prompt-and-parse; `parsed_output` null-safe ở mọi nơi.
+- Chi phí token → Opus 4.8, `effort: "medium"`, `max_tokens: 2048`/lời gọi; không batch lớn.
+- Key lộ → chỉ gọi Claude trong server action (`'use server'`); không client component nào import claude-client (verified).
+
+## Completion Notes (Session 2026-06-17)
+- Đã đọc skill `claude-api` (TypeScript): `@anthropic-ai/sdk` 0.104.2, `claude-opus-4-8`, adaptive-only (không temperature/top_p/budget_tokens), `output_config.effort`, `messages.parse` + `zodOutputFormat` (zod v4).
+- Next 16: dynamic route `params` là Promise → `await params` (verified docs).
+- Quyết định (user chốt): generateCaption tạo 1 post/nền tảng (3 draft/ý tưởng) → redirect editor; flow chỉ tạo post qua ý tưởng (không có nút post trắng riêng).
+- Fixes sau code review:
+  - **H1 (atomicity):** sinh cả 3 caption trước (`Promise.all`), insert một lần trong `db.transaction` → không còn post mồ côi khi 1 lời gọi Claude lỗi giữa chừng. (Verified runtime: transaction insert 3 row + returning id OK.)
+  - **H2 (trust boundary):** validate `platform` qua `PLATFORMS.includes` thay vì cast `as Platform`.
+  - **M3:** thêm comment cảnh báo prompt-injection cho multi-tenant tương lai.
+- Verify: `npm run lint` clean · `npm run build` pass (TS clean; /ideas static, /editor/[postId] dynamic) · smoke test data layer (idea/post/sibling/saveCaption) + transaction path OK.
+- README cập nhật (env ANTHROPIC_API_KEY, tính năng /ideas + /editor, cấu trúc thư mục).
+
+### Deferred (non-blocking, YAGNI cho local v1)
+- Chưa có unit test tự động (smoke test thủ công).
+- `idea.platform` lưu nhưng generateCaption luôn sinh 3 nền tảng (đúng theo quyết định scope).
+- max_tokens caption 2048 — nâng 3072 nếu thấy FB bị cắt.

@@ -19,13 +19,15 @@ export default function Home() {
             <CardContent className="text-sm text-muted-foreground">Thiết lập ngay →</CardContent>
           </Card>
         </Link>
-        <Card>
-          <CardHeader>
-            <CardTitle>Ý tưởng & Caption</CardTitle>
-            <CardDescription>Sinh nội dung bằng AI (Phase 3)</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">Sắp có</CardContent>
-        </Card>
+        <Link href="/ideas" className="block transition-opacity hover:opacity-80">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ý tưởng & Caption</CardTitle>
+              <CardDescription>Sinh nội dung bằng AI</CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">Bắt đầu sinh →</CardContent>
+          </Card>
+        </Link>
       </div>
     </main>
   );

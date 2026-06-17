@@ -2,12 +2,12 @@
 
 Web app sinh nội dung + quản lý lịch đăng cho **1 thương hiệu** (tiếng Việt). Sinh caption/bài + ý tưởng bằng Claude API, upload ảnh thủ công, hỗ trợ Facebook / Instagram / TikTok. Đăng thủ công (không auto-post). Local-first.
 
-**Stack:** Next.js 16 (App Router) · SQLite + Drizzle ORM · Tailwind + shadcn/ui · zod · Claude API (Phase 3).
+**Stack:** Next.js 16 (App Router) · SQLite + Drizzle ORM · Tailwind + shadcn/ui · zod · Claude API (`claude-opus-4-8`).
 
 ## Yêu cầu
 
 - Node 18+
-- (Phase 3) `ANTHROPIC_API_KEY` — chưa cần ở Phase 2
+- `ANTHROPIC_API_KEY` — để sinh ý tưởng/caption tự động. Thiếu key app vẫn chạy: chỉ ẩn nút sinh, vẫn nhập/sửa caption thủ công được.
 
 ## Bắt đầu
 
@@ -17,11 +17,14 @@ npm run db:migrate   # tạo local.db + bảng
 npm run dev          # http://localhost:3000
 ```
 
-Cấu hình DB qua `.env.local` (mặc định nếu bỏ trống):
+Cấu hình qua `.env.local`:
 
 ```
-DATABASE_URL=file:./local.db
+DATABASE_URL=file:./local.db   # mặc định nếu bỏ trống
+ANTHROPIC_API_KEY=             # để trống nếu chưa có; sinh AI sẽ tắt
 ```
+
+> Đặt `ANTHROPIC_API_KEY` rồi khởi động lại dev server để bật sinh ý tưởng/caption.
 
 ## Scripts
 
@@ -47,27 +50,51 @@ Thiết lập 1 thương hiệu — đầu vào ngữ cảnh cho mọi phần si
 
 Cơ chế single-brand: lần đầu là form tạo; sau đó là form sửa. Validate phía server bằng zod (báo lỗi khi thiếu tên/ngành). Truy cập từ trang chủ hoặc trực tiếp `/brand`.
 
+### Ý tưởng & Caption (`/ideas`)
+
+Sinh nội dung bằng Claude (`claude-opus-4-8`), dùng ngữ cảnh từ Brand Profile:
+
+- **Sinh ý tưởng**: chọn content pillar + nền tảng (FB/IG/TikTok) → sinh ~6 tiêu đề ý tưởng, lưu vào DB.
+- **Tạo caption**: từ 1 ý tưởng → sinh caption riêng cho cả 3 nền tảng (1 bản nháp/nền tảng) rồi chuyển sang trình soạn thảo.
+- Quy tắc theo nền tảng nằm trong prompt: FB (dài, kể chuyện), IG (ngắn + emoji + nhiều hashtag), TikTok (hook mạnh + CTA).
+- Output dùng **structured outputs** (zod) nên parse an toàn, không lo JSON hỏng.
+- Thiếu `ANTHROPIC_API_KEY`: ẩn nút sinh, vẫn nhập caption thủ công được.
+
+### Soạn caption (`/editor/[postId]`)
+
+Sửa caption + hashtags của một bản nháp; chuyển nhanh giữa các nền tảng cùng ý tưởng; lưu thủ công (cũng dùng khi không có API key). Tất cả lời gọi Claude chạy ở server action — API key không bao giờ lộ ra client.
+
 ## Cấu trúc thư mục
 
 ```
 app/
-  page.tsx              # dashboard
-  brand/
-    page.tsx            # trang Brand Profile (Server Component)
-    brand-form.tsx      # form CRUD (Client Component)
+  page.tsx                 # dashboard
+  brand/                   # Brand Profile (page + form)
+  ideas/
+    page.tsx               # Idea generator + danh sách (Server Component)
+    ideas-generator.tsx    # form sinh ý tưởng (Client)
+    create-caption-button.tsx # nút tạo caption / ý tưởng (Client)
+  editor/[postId]/
+    page.tsx               # caption editor (Server Component)
+    caption-editor.tsx     # form sửa caption (Client)
   actions/
-    brand.ts            # server actions: getBrand, upsertBrand
+    brand.ts               # getBrand, upsertBrand
+    generate.ts            # generateIdeas, generateCaption (gọi Claude)
+    post.ts                # listIdeas, getPost, getSiblingPosts, saveCaption
 db/
-  schema.ts             # Drizzle schema (brand, idea, post, asset)
-  index.ts              # Drizzle client (better-sqlite3)
-  migrate.ts            # chạy migration
+  schema.ts                # Drizzle schema (brand, idea, post, asset)
+  index.ts                 # Drizzle client (better-sqlite3)
+  migrate.ts               # chạy migration
 lib/
-  json.ts              # serialize/parse JSON text (pillars, hashtags...)
-  validations/brand.ts  # zod schema cho brand
-components/ui/          # shadcn components
-drizzle/                # file migration sinh ra
+  json.ts                  # serialize/parse JSON text (pillars, hashtags...)
+  ai/
+    claude-client.ts       # Anthropic client + hasApiKey + model id
+    prompts.ts             # prompt VN + quy tắc nền tảng
+  validations/             # zod schema (brand, generate)
+components/ui/             # shadcn components
+drizzle/                   # file migration sinh ra
 ```
 
 ## Lộ trình
 
-Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile). Tiếp theo: Phase 3 (sinh nội dung AI).
+Xem `plans/20260617-content-creator-agent/plan.md`. Đã xong: Phase 1 (setup), Phase 2 (Brand Profile), Phase 3 (sinh nội dung AI). Tiếp theo: Phase 4 (lịch đăng).
