@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -44,3 +45,7 @@ next-env.d.ts
 *.db
 *.db-shm
 *.db-wal
+
+# uploaded assets (local-first; giữ thư mục, bỏ qua nội dung)
+/public/uploads/*
+!/public/uploads/.gitkeep

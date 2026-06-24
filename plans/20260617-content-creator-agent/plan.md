@@ -1,7 +1,7 @@
 ---
 title: Content Creator Web App
 description: ''
-status: pending
+status: completed
 priority: P2
 branch: ''
 tags: []
@@ -30,10 +30,10 @@ Web app sinh content + quản lý lịch đăng cho **1 thương hiệu kinh doa
 |-------|------|--------|
 | 1 | [Setup Next.js + DB](./phase-01-setup-next-js-db.md) | Completed |
 | 2 | [Brand Profile](./phase-02-brand-profile.md) | Completed |
-| 3 | [AI Text Generation](./phase-03-ai-text-generation.md) | Pending |
-| 4 | [Content Calendar](./phase-04-content-calendar.md) | Pending |
-| 5 | [Asset Library](./phase-05-asset-library.md) | Pending |
-| 6 | [Polish & Deploy Prep](./phase-06-polish-deploy-prep.md) | Pending |
+| 3 | [AI Text Generation](./phase-03-ai-text-generation.md) | Completed |
+| 4 | [Content Calendar](./phase-04-content-calendar.md) | Completed |
+| 5 | [Asset Library](./phase-05-asset-library.md) | Completed |
+| 6 | [Polish & Deploy Prep](./phase-06-polish-deploy-prep.md) | Completed |
 
 ## Dependencies
 
