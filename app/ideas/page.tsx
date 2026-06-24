@@ -8,7 +8,7 @@ import { listIdeas } from "@/app/actions/post";
 import { hasApiKey } from "@/lib/ai/claude-client";
 import { PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
 import { IdeasGenerator } from "./ideas-generator";
-import { CreateCaptionButton } from "./create-caption-button";
+import { IdeaActions } from "./idea-actions";
 
 export const metadata = { title: "Ý tưởng & Caption" };
 
@@ -20,7 +20,7 @@ export default async function IdeasPage() {
   const keyAvailable = hasApiKey();
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <div className="mx-auto max-w-2xl px-6 py-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Ý tưởng & Caption</h1>
         <Link href="/posts" className="text-sm text-muted-foreground underline">
@@ -49,24 +49,23 @@ export default async function IdeasPage() {
           ) : (
             <ul className="space-y-3">
               {ideas.map((it) => (
-                <li
-                  key={it.id}
-                  className="flex items-start justify-between gap-3 rounded-lg border p-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{it.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {it.pillar}
-                      {it.platform ? ` · ${PLATFORM_LABELS[it.platform as Platform]}` : ""}
-                    </p>
+                <li key={it.id} className="space-y-2 rounded-lg border p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{it.title}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {it.pillar}
+                        {it.platform ? ` · ${PLATFORM_LABELS[it.platform as Platform]}` : ""}
+                      </p>
+                    </div>
+                    <IdeaActions ideaId={it.id} outline={it.outline} hasApiKey={keyAvailable} />
                   </div>
-                  <CreateCaptionButton ideaId={it.id} hasApiKey={keyAvailable} />
                 </li>
               ))}
             </ul>
           )}
         </>
       )}
-    </main>
+    </div>
   );
 }

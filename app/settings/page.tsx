@@ -27,9 +27,8 @@ export default async function SettingsPage() {
   const status = await getKeyStatus();
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-bold tracking-tight">Cài đặt</h1>
-      <p className="mt-1 mb-8 text-sm text-muted-foreground">
+    <div className="mx-auto max-w-2xl px-6 py-8">
+      <p className="mb-8 text-sm text-muted-foreground">
         API key cấu hình trong <code className="font-mono">.env.local</code> rồi khởi động lại server.
         Không nhập key qua giao diện để tránh lộ.
       </p>
@@ -74,6 +73,6 @@ export default async function SettingsPage() {
       <Link href="/" className="mt-8 inline-block text-sm text-muted-foreground underline">
         ← Về dashboard
       </Link>
-    </main>
+    </div>
   );
 }

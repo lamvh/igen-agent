@@ -16,9 +16,8 @@ export default async function AssetsPage() {
   const [assets, geminiKey] = await Promise.all([listAssets(), Promise.resolve(hasGeminiKey())]);
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-12">
-      <h1 className="text-2xl font-bold tracking-tight">Thư viện ảnh</h1>
-      <p className="mt-1 mb-6 text-sm text-muted-foreground">
+    <div className="mx-auto max-w-4xl px-6 py-8">
+      <p className="mb-6 text-sm text-muted-foreground">
         Tải ảnh thủ công để gắn vào bài đăng. Ảnh lưu local trong <code>public/uploads/</code>.
       </p>
 
@@ -43,6 +42,6 @@ export default async function AssetsPage() {
           ))}
         </div>
       )}
-    </main>
+    </div>
   );
 }

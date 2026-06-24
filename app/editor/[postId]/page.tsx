@@ -30,7 +30,7 @@ export default async function EditorPage({ params }: { params: Promise<{ postId:
   const attachedIds = parseJsonArray<number>(post.assetIds);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <div className="mx-auto max-w-2xl px-6 py-8">
       <Link href="/ideas" className="text-sm text-muted-foreground underline">
         ← Về danh sách ý tưởng
       </Link>
@@ -66,6 +66,6 @@ export default async function EditorPage({ params }: { params: Promise<{ postId:
         />
         <AssetPicker postId={post.id} assets={assets} attachedIds={attachedIds} />
       </div>
-    </main>
+    </div>
   );
 }

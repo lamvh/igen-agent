@@ -54,9 +54,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   };
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-bold tracking-tight">Nội dung</h1>
-      <p className="mt-1 mb-6 text-sm text-muted-foreground">
+    <div className="mx-auto max-w-2xl px-6 py-8">
+      <p className="mb-6 text-sm text-muted-foreground">
         Tất cả caption đã tạo (gồm bản nháp). Click để mở trình soạn.
       </p>
 
@@ -130,6 +129,6 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
           ))}
         </ul>
       )}
-    </main>
+    </div>
   );
 }

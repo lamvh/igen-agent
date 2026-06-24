@@ -34,6 +34,8 @@ export const idea = sqliteTable("idea", {
     .notNull()
     .references(() => brand.id),
   title: text("title").notNull(),
+  // Dàn ý chi tiết triển khai từ title (bước 2 của quy trình); null nếu chưa tạo.
+  outline: text("outline"),
   pillar: text("pillar"),
   platform: text("platform"), // 'facebook' | 'instagram' | 'tiktok'
   status: text("status").notNull().default("draft"),

@@ -41,7 +41,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
     `/calendar?y=${year}&m=${monthIndex0 + 1}${p ? `&platform=${p}` : ""}`;
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
+    <div className="mx-auto max-w-5xl px-6 py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Lịch nội dung</h1>
         <div className="flex items-center gap-2 text-sm">
@@ -80,6 +80,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       )}
 
       <MonthGrid year={year} monthIndex0={monthIndex0} posts={posts} />
-    </main>
+    </div>
   );
 }
