@@ -71,6 +71,21 @@ export function BrandForm({ brand }: { brand: BrandView | null }) {
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="guidelines">Nguyên tắc tuân thủ (cho AI)</Label>
+        <Textarea
+          id="guidelines"
+          name="guidelines"
+          rows={4}
+          defaultValue={brand?.guidelines ?? ""}
+          placeholder={"Mỗi dòng 1 quy tắc, VD:\n- Không phóng đại, không hứa hẹn quá mức\n- Luôn xưng “shop” với khách\n- Không nhắc tên đối thủ"}
+        />
+        <p className="text-xs text-muted-foreground">
+          Các quy tắc này được nhúng vào mọi prompt — AI sẽ tuân theo khi sinh ý tưởng, dàn ý,
+          caption và prompt ảnh.
+        </p>
+      </div>
+
+      <div className="space-y-2">
         <Label>Content pillars</Label>
         <div className="space-y-2">
           {pillars.map((pillar, i) => (

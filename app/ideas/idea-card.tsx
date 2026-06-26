@@ -8,17 +8,20 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, ListChecks, ImageIcon, FileText, ArrowUpRight } from "lucide-react";
+import { Sparkles, ListChecks, ImageIcon, FileText, ArrowUpRight, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { CopyButton } from "@/components/shell/copy-button";
 import { IdeaActions, CaptionCreator } from "./idea-actions";
 import {
   generateOutline,
   generateImagePromptForIdea,
+  refineOutline,
   type GenerateState,
 } from "@/app/actions/generate";
-import type { IdeaPostLink } from "@/app/actions/post";
+import { saveIdeaOutline, type IdeaPostLink } from "@/app/actions/post";
 
 /** Nút sinh dàn ý / prompt trong panel; refresh để hiện nội dung mới. */
 function GenerateButton({
@@ -60,6 +63,106 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
+
+/**
+ * Editor dàn ý trong panel: sửa tay (textarea + Lưu) + tinh chỉnh bằng AI
+ * (nhập yêu cầu → refineOutline viết lại). Đồng bộ lại từ server sau khi đổi.
+ */
+function OutlineEditor({
+  ideaId,
+  outline,
+  hasApiKey,
+}: {
+  ideaId: number;
+  outline: string | null;
+  hasApiKey: boolean;
+}) {
+  const router = useRouter();
+  const [text, setText] = useState(outline ?? "");
+  const [instruction, setInstruction] = useState("");
+  const [saving, startSave] = useTransition();
+  const [refining, startRefine] = useTransition();
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+
+  const dirty = text !== (outline ?? "");
+
+  function onSave() {
+    setError("");
+    setMsg("");
+    startSave(async () => {
+      const res = await saveIdeaOutline(ideaId, text);
+      if (res.success) {
+        setMsg("Đã lưu");
+        router.refresh();
+      } else setError(res.message);
+    });
+  }
+
+  function onRefine() {
+    const note = instruction.trim();
+    if (!note) return;
+    setError("");
+    setMsg("");
+    startRefine(async () => {
+      const res = await refineOutline(ideaId, note);
+      if (res.success) {
+        setInstruction("");
+        router.refresh(); // server trả dàn ý mới → useEffect đồng bộ qua key
+      } else setError(res.message);
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={8}
+        placeholder="Chưa có dàn ý. Bấm “Tạo dàn ý” hoặc viết tay tại đây."
+        className="text-xs"
+      />
+      <div className="flex items-center gap-2">
+        <Button type="button" size="sm" onClick={onSave} disabled={saving || !dirty}>
+          {saving && <Spinner />}
+          Lưu dàn ý
+        </Button>
+        {msg && <span className="text-xs text-green-600">{msg}</span>}
+      </div>
+
+      {/* Tinh chỉnh bằng AI theo yêu cầu. */}
+      {hasApiKey && outline && (
+        <div className="space-y-2 rounded-lg border border-dashed p-2.5">
+          <Input
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onRefine();
+              }
+            }}
+            placeholder="Yêu cầu chỉnh: VD thêm phần khuyến mãi, ngắn gọn hơn…"
+            disabled={refining}
+            className="text-xs"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onRefine}
+            disabled={refining || !instruction.trim()}
+          >
+            {refining ? <Spinner /> : <Wand2 className="size-4" />}
+            {refining ? "Đang cập nhật…" : "Cập nhật bằng AI"}
+          </Button>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
 
 const PLATFORM_BADGE: Record<string, string> = {
   facebook: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
@@ -191,7 +294,7 @@ export function IdeaCard({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton
-          className="top-0 right-0 left-auto h-svh max-h-svh w-full max-w-md translate-x-0 translate-y-0 overflow-y-auto rounded-none rounded-l-2xl sm:max-w-md data-open:slide-in-from-right data-closed:slide-out-to-right"
+          className="top-0 right-0 left-auto flex h-svh max-h-svh w-full max-w-md translate-x-0 translate-y-0 flex-col items-stretch gap-0 space-y-4 overflow-y-auto rounded-none rounded-l-2xl p-5 sm:max-w-md data-open:slide-in-from-right data-closed:slide-out-to-right"
         >
           <DialogHeader>
             <DialogTitle className="pr-8">{idea.title}</DialogTitle>
@@ -256,7 +359,7 @@ export function IdeaCard({
               </section>
             )}
 
-            {/* Dàn ý — nút tạo nằm ngay tại section này. */}
+            {/* Dàn ý — sửa tay + tinh chỉnh AI. key theo nội dung để đồng bộ sau refresh. */}
             <section>
               <div className="mb-1.5 flex items-center justify-between">
                 <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -270,15 +373,12 @@ export function IdeaCard({
                   />
                 )}
               </div>
-              {idea.outline ? (
-                <pre className="whitespace-pre-wrap rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
-                  {idea.outline}
-                </pre>
-              ) : (
-                <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-                  Chưa có dàn ý. Bấm “Tạo dàn ý” để triển khai ý tưởng thành hook + ý chính + CTA.
-                </p>
-              )}
+              <OutlineEditor
+                key={idea.outline ?? "empty"}
+                ideaId={idea.id}
+                outline={idea.outline}
+                hasApiKey={hasApiKey}
+              />
             </section>
 
             {/* Prompt ảnh — nút tạo nằm ngay tại section này. */}

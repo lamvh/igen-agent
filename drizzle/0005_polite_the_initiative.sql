@@ -1,0 +1,1 @@
+ALTER TABLE `brand` ADD `guidelines` text DEFAULT '' NOT NULL;

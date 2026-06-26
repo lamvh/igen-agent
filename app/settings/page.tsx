@@ -4,10 +4,18 @@
  */
 import Link from "next/link";
 import { getKeyStatus } from "@/app/actions/settings";
+import { getBrand } from "@/app/actions/brand";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { ClaudeTestButton } from "./claude-test-button";
+import { BrandForm } from "@/app/brand/brand-form";
 
 export const metadata = { title: "Cài đặt" };
+
+type Tab = "brand" | "api";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "brand", label: "Thương hiệu" },
+  { id: "api", label: "API & Sử dụng" },
+];
 
 // Đọc trạng thái env lúc request (key có thể đổi giữa các lần khởi động).
 export const dynamic = "force-dynamic";
@@ -33,17 +41,56 @@ const fmtUsd = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 4,
 });
 
-export default async function SettingsPage() {
-  const [status, usage] = await Promise.all([getKeyStatus(), getUsageSummary()]);
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { tab } = await searchParams;
+  const activeTab: Tab = tab === "api" ? "api" : "brand";
+
+  const [status, usage, brand] = await Promise.all([
+    getKeyStatus(),
+    getUsageSummary(),
+    getBrand(),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
-      <p className="mb-8 text-sm text-muted-foreground">
-        API key cấu hình trong <code className="font-mono">.env.local</code> rồi khởi động lại server.
-        Không nhập key qua giao diện để tránh lộ.
-      </p>
+      {/* Tab điều hướng (server-side qua searchParams). */}
+      <div className="mb-6 flex gap-1 rounded-xl border bg-muted/40 p-1">
+        {TABS.map((t) => (
+          <Link
+            key={t.id}
+            href={`/settings?tab=${t.id}`}
+            className={`flex-1 rounded-lg px-3 py-1.5 text-center text-sm font-medium transition-colors ${
+              activeTab === t.id
+                ? "bg-background shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
 
-      <div className="space-y-4">
+      {activeTab === "brand" ? (
+        <section>
+          <p className="mb-6 text-sm text-muted-foreground">
+            {brand
+              ? "Cập nhật thông tin thương hiệu — dùng làm ngữ cảnh cho sinh nội dung."
+              : "Thiết lập thương hiệu của bạn để bắt đầu sinh nội dung."}
+          </p>
+          <BrandForm brand={brand} />
+        </section>
+      ) : (
+        <section>
+          <p className="mb-6 text-sm text-muted-foreground">
+            API key cấu hình trong <code className="font-mono">.env.local</code> rồi khởi động lại
+            server. Không nhập key qua giao diện để tránh lộ.
+          </p>
+
+          <div className="space-y-4">
         <div className="rounded-lg border p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -120,11 +167,9 @@ export default async function SettingsPage() {
             </a>
           </p>
         </div>
-      </div>
-
-      <Link href="/" className="mt-8 inline-block text-sm text-muted-foreground underline">
-        ← Về dashboard
-      </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

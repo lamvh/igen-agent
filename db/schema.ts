@@ -22,6 +22,8 @@ export const brand = sqliteTable("brand", {
   products: text("products").notNull().default(""),
   toneOfVoice: text("tone_of_voice").notNull().default(""),
   audience: text("audience").notNull().default(""),
+  // Nguyên tắc tuân thủ cho AI (nhúng vào mọi prompt sinh nội dung).
+  guidelines: text("guidelines").notNull().default(""),
   pillars: text("pillars").notNull().default("[]"), // JSON text: string[]
   // Danh sách tag định sẵn để phân loại ý tưởng (quản lý ở Brand Profile).
   tags: text("tags").notNull().default("[]"), // JSON text: string[]

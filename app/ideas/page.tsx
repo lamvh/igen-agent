@@ -52,7 +52,7 @@ export default async function IdeasPage({
       {!brand ? (
         <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
           Bạn cần{" "}
-          <Link href="/brand" className="underline">
+          <Link href="/settings?tab=brand" className="underline">
             thiết lập Brand Profile
           </Link>{" "}
           trước khi sinh nội dung.

@@ -5,7 +5,6 @@
  */
 import {
   LayoutDashboard,
-  Building2,
   Lightbulb,
   FileText,
   Calendar,
@@ -27,7 +26,6 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Tổng quan", desc: "Số liệu & điều hướng nhanh", cta: "Mở dashboard →", icon: LayoutDashboard },
-  { href: "/brand", label: "Brand Profile", desc: "Thiết lập thương hiệu", cta: "Thiết lập →", icon: Building2 },
   { href: "/ideas", label: "Ý tưởng & Caption", desc: "Sinh nội dung bằng AI", cta: "Bắt đầu sinh →", icon: Lightbulb },
   { href: "/posts", label: "Nội dung", desc: "Xem mọi caption & bản nháp", cta: "Xem nội dung →", icon: FileText },
   { href: "/calendar", label: "Lịch nội dung", desc: "Xếp lịch đăng theo nền tảng", cta: "Xem lịch →", icon: Calendar },

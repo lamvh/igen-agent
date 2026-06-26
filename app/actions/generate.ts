@@ -18,6 +18,7 @@ import { getClaudeClient, hasApiKey, CLAUDE_MODEL } from "@/lib/ai/claude-client
 import {
   ideaPrompt,
   outlinePrompt,
+  refineOutlinePrompt,
   captionPrompt,
   imagePromptPrompt,
   PLATFORMS,
@@ -231,6 +232,55 @@ export async function generateOutline(ideaId: number): Promise<GenerateState> {
   await db.update(idea).set({ outline: outlineText }).where(eq(idea.id, ideaId));
   revalidatePath("/ideas");
   return { success: true, message: "Đã tạo dàn ý." };
+}
+
+/**
+ * Tinh chỉnh dàn ý hiện có theo yêu cầu người dùng (AI viết lại dựa trên bản hiện tại).
+ * Cần ý tưởng đã có dàn ý; ghi đè idea.outline bằng bản mới.
+ */
+export async function refineOutline(ideaId: number, instruction: string): Promise<GenerateState> {
+  if (!hasApiKey()) return NO_KEY;
+
+  const brand = await getBrand();
+  if (!brand) return NO_BRAND;
+
+  const note = instruction.trim();
+  if (!note) return { success: false, message: "Vui lòng nhập yêu cầu chỉnh sửa." };
+
+  const rows = await db.select().from(idea).where(eq(idea.id, ideaId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
+  if (!current.outline) {
+    return { success: false, message: "Chưa có dàn ý để chỉnh — hãy tạo dàn ý trước." };
+  }
+
+  const platform = toPlatform(current.platform);
+
+  let outlineText = "";
+  try {
+    const client = getClaudeClient();
+    const result = await client.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      output_config: { effort: "low", format: zodOutputFormat(ideaOutlineSchema) },
+      messages: [
+        {
+          role: "user",
+          content: refineOutlinePrompt(brand, current.title, platform, current.outline, note),
+        },
+      ],
+    });
+    await logUsage("outline", result.usage);
+    const parsed = result.parsed_output;
+    if (!parsed) return { success: false, message: "Không cập nhật được dàn ý, vui lòng thử lại." };
+    outlineText = formatOutline(parsed);
+  } catch {
+    return { success: false, message: "Cập nhật dàn ý thất bại, vui lòng thử lại." };
+  }
+
+  await db.update(idea).set({ outline: outlineText }).where(eq(idea.id, ideaId));
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã cập nhật dàn ý." };
 }
 
 /** Gọi Claude sinh caption + hashtags cho 1 nền tảng từ 1 ý tưởng; null nếu lỗi. */

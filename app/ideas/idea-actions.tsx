@@ -7,11 +7,13 @@
  * Tách riêng để card tối giản, mọi thao tác sinh nội dung gom vào panel.
  */
 import { useState, useTransition } from "react";
-import { Tag, Check, Sparkles } from "lucide-react";
+import { Tag, Check, Sparkles, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { DeleteButton } from "@/components/shell/delete-button";
 import { generateCaption } from "@/app/actions/generate";
+import { addBrandTag, removeBrandTag } from "@/app/actions/brand";
 import { deleteIdea, updateIdeaTags } from "@/app/actions/post";
 import {
   PLATFORMS,
@@ -120,9 +122,15 @@ export function IdeaActions({
   tags: string[];
   availableTags: string[];
 }) {
-  // Tag được lưu ngay khi toggle; optimistic để chip cập nhật tức thì.
+  // Tag của ý tưởng này (đã gắn) — optimistic.
   const [tagState, setTagState] = useState<string[]>(tags);
   const [tagSaving, startTagSave] = useTransition();
+
+  // Danh sách tag chung của brand — cho phép tạo/xóa ngay trong modal.
+  const [tagList, setTagList] = useState<string[]>(availableTags);
+  const [newTag, setNewTag] = useState("");
+  const [tagMgmtPending, startTagMgmt] = useTransition();
+  const [tagError, setTagError] = useState("");
 
   function toggleTag(tag: string) {
     const next = tagState.includes(tag)
@@ -134,47 +142,120 @@ export function IdeaActions({
     });
   }
 
+  function onAddTag() {
+    const name = newTag.trim();
+    if (!name) return;
+    setTagError("");
+    startTagMgmt(async () => {
+      const res = await addBrandTag(name);
+      setTagList(res.tags);
+      if (res.success) {
+        setNewTag("");
+        toggleTag(name); // tự gắn tag vừa tạo
+      } else {
+        setTagError(res.message);
+      }
+    });
+  }
+
+  function onRemoveTag(tag: string) {
+    setTagError("");
+    startTagMgmt(async () => {
+      const res = await removeBrandTag(tag);
+      setTagList(res.tags);
+      if (!res.success) setTagError(res.message);
+      else setTagState((prev) => prev.filter((t) => t !== tag)); // gỡ khỏi ý tưởng nếu đang gắn
+    });
+  }
+
   return (
     <div className="flex items-center justify-between">
-      {availableTags.length > 0 ? (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button type="button" size="sm" variant="ghost" className="text-xs text-muted-foreground">
-              <Tag className="size-3.5" />
-              {tagState.length > 0 ? `${tagState.length} tag` : "Gắn tag"}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Gắn tag</DialogTitle>
-              <DialogDescription>Chọn tag để phân loại ý tưởng này.</DialogDescription>
-            </DialogHeader>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button type="button" size="sm" variant="ghost" className="text-xs text-muted-foreground">
+            <Tag className="size-3.5" />
+            {tagState.length > 0 ? `${tagState.length} tag` : "Gắn tag"}
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tag</DialogTitle>
+            <DialogDescription>
+              Chọn tag để gắn cho ý tưởng, hoặc tạo/xóa tag trong danh sách chung.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Danh sách tag: bấm chip để gắn/bỏ; nút × để xóa khỏi danh sách chung. */}
+          {tagList.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {availableTags.map((tag) => {
+              {tagList.map((tag) => {
                 const active = tagState.includes(tag);
                 return (
-                  <button
+                  <span
                     key={tag}
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    disabled={tagSaving}
-                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-sm transition-colors ${
-                      active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input hover:bg-muted"
+                    className={`group inline-flex items-center gap-1 rounded-full border pr-1 text-sm transition-colors ${
+                      active ? "border-primary bg-primary text-primary-foreground" : "border-input"
                     }`}
                   >
-                    {active && <Check className="size-3.5" />}
-                    {tag}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      disabled={tagSaving}
+                      className="inline-flex items-center gap-1 rounded-full py-1 pl-3"
+                    >
+                      {active && <Check className="size-3.5" />}
+                      {tag}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveTag(tag)}
+                      disabled={tagMgmtPending}
+                      aria-label={`Xóa tag ${tag}`}
+                      className={`rounded-full p-0.5 transition-colors ${
+                        active ? "hover:bg-primary-foreground/20" : "text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
                 );
               })}
             </div>
-          </DialogContent>
-        </Dialog>
-      ) : (
-        <span />
-      )}
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Chưa có tag nào. Tạo tag đầu tiên bên dưới.
+            </p>
+          )}
+
+          {/* Ô tạo tag mới. */}
+          <div className="flex items-center gap-2">
+            <Input
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onAddTag();
+                }
+              }}
+              placeholder="Tạo tag mới…"
+              maxLength={40}
+              disabled={tagMgmtPending}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onAddTag}
+              disabled={tagMgmtPending || !newTag.trim()}
+            >
+              {tagMgmtPending ? <Spinner /> : <Plus className="size-4" />}
+              Thêm
+            </Button>
+          </div>
+          {tagError && <p className="text-xs text-destructive">{tagError}</p>}
+        </DialogContent>
+      </Dialog>
+
       <DeleteButton
         action={() => deleteIdea(ideaId)}
         title="Xóa ý tưởng này?"

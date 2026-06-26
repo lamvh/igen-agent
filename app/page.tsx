@@ -46,7 +46,7 @@ export default async function Home() {
       {!stats.hasBrand ? (
         <div className="mt-6 rounded-2xl border border-dashed border-primary/30 bg-accent/40 p-4 text-sm text-muted-foreground">
           Bắt đầu bằng cách{" "}
-          <Link href="/brand" className="font-medium text-primary underline underline-offset-2">
+          <Link href="/settings?tab=brand" className="font-medium text-primary underline underline-offset-2">
             thiết lập Brand Profile
           </Link>
           .

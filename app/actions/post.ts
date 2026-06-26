@@ -195,6 +195,21 @@ export async function updateIdeaTags(ideaId: number, tags: string[]): Promise<De
   return { success: true, message: "Đã cập nhật tag." };
 }
 
+/** Lưu dàn ý sửa tay cho 1 ý tưởng. Trống → đặt null (coi như chưa có dàn ý). */
+export async function saveIdeaOutline(ideaId: number, outline: string): Promise<DeleteState> {
+  if (!Number.isInteger(ideaId) || ideaId <= 0) {
+    return { success: false, message: "Ý tưởng không hợp lệ." };
+  }
+  const value = outline.trim() || null;
+  try {
+    await db.update(idea).set({ outline: value }).where(eq(idea.id, ideaId));
+  } catch {
+    return { success: false, message: "Lưu dàn ý thất bại." };
+  }
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã lưu dàn ý." };
+}
+
 /**
  * Xóa 1 ý tưởng. Các post sinh từ ý tưởng này được GIỮ LẠI — chỉ gỡ liên kết
  * (post.ideaId = null) để không phá ràng buộc khóa ngoại và không mất nội dung.

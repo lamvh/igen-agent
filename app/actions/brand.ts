@@ -8,7 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { brand, type Brand } from "@/db/schema";
+import { brand, idea, type Brand } from "@/db/schema";
 import { brandSchema } from "@/lib/validations/brand";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
 
@@ -52,6 +52,7 @@ export async function upsertBrand(
     products: formData.get("products") ?? "",
     toneOfVoice: formData.get("toneOfVoice") ?? "",
     audience: formData.get("audience") ?? "",
+    guidelines: formData.get("guidelines") ?? "",
     pillars,
     tags,
   });
@@ -71,6 +72,7 @@ export async function upsertBrand(
     products: data.products,
     toneOfVoice: data.toneOfVoice,
     audience: data.audience,
+    guidelines: data.guidelines,
     pillars: serializeJsonArray(data.pillars),
     tags: serializeJsonArray(data.tags),
   };
@@ -89,4 +91,72 @@ export async function upsertBrand(
 
   revalidatePath("/brand");
   return { success: true, message: "Đã lưu brand profile.", errors: {} };
+}
+
+export type TagListResult = { success: boolean; message: string; tags: string[] };
+
+/** Lấy brand row đầu tiên + danh sách tags đã parse; null nếu chưa có brand. */
+async function getBrandWithTags(): Promise<{ id: number; tags: string[] } | null> {
+  const rows = await db.select({ id: brand.id, tags: brand.tags }).from(brand).orderBy(asc(brand.id)).limit(1);
+  if (!rows[0]) return null;
+  return { id: rows[0].id, tags: parseJsonArray<string>(rows[0].tags) };
+}
+
+/** Thêm 1 tag vào danh sách tag chung của brand (trùng thì bỏ qua). Trả danh sách mới. */
+export async function addBrandTag(name: string): Promise<TagListResult> {
+  const tag = name.trim();
+  if (!tag) return { success: false, message: "Tên tag không được trống.", tags: [] };
+
+  const b = await getBrandWithTags();
+  if (!b) return { success: false, message: "Cần thiết lập Brand Profile trước.", tags: [] };
+
+  // So sánh không phân biệt hoa thường để tránh tag trùng.
+  if (b.tags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
+    return { success: false, message: "Tag đã tồn tại.", tags: b.tags };
+  }
+
+  const next = [...b.tags, tag];
+  try {
+    await db.update(brand).set({ tags: serializeJsonArray(next) }).where(eq(brand.id, b.id));
+  } catch {
+    return { success: false, message: "Thêm tag thất bại.", tags: b.tags };
+  }
+  revalidatePath("/ideas");
+  revalidatePath("/settings");
+  return { success: true, message: "Đã thêm tag.", tags: next };
+}
+
+/**
+ * Xóa 1 tag khỏi danh sách chung của brand VÀ gỡ tag đó khỏi mọi ý tưởng đang dùng.
+ * Trả danh sách tag mới của brand.
+ */
+export async function removeBrandTag(name: string): Promise<TagListResult> {
+  const tag = name.trim();
+  if (!tag) return { success: false, message: "Tag không hợp lệ.", tags: [] };
+
+  const b = await getBrandWithTags();
+  if (!b) return { success: false, message: "Cần thiết lập Brand Profile trước.", tags: [] };
+
+  const next = b.tags.filter((t) => t !== tag);
+  try {
+    db.transaction((tx) => {
+      tx.update(brand).set({ tags: serializeJsonArray(next) }).where(eq(brand.id, b.id)).run();
+      // Gỡ tag khỏi mọi idea đang dùng (tránh tag mồ côi).
+      const ideaRows = tx.select({ id: idea.id, tags: idea.tags }).from(idea).all();
+      for (const r of ideaRows) {
+        const ideaTags = parseJsonArray<string>(r.tags);
+        if (ideaTags.includes(tag)) {
+          tx.update(idea)
+            .set({ tags: serializeJsonArray(ideaTags.filter((t) => t !== tag)) })
+            .where(eq(idea.id, r.id))
+            .run();
+        }
+      }
+    });
+  } catch {
+    return { success: false, message: "Xóa tag thất bại.", tags: b.tags };
+  }
+  revalidatePath("/ideas");
+  revalidatePath("/settings");
+  return { success: true, message: "Đã xóa tag.", tags: next };
 }
