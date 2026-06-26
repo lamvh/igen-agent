@@ -63,10 +63,15 @@ function Brand() {
   );
 }
 
-/** Rail cố định cho desktop (ẩn dưới md). */
-export function DesktopSidebar() {
+/** Rail cố định cho desktop (ẩn dưới md). `hidden` cho phép người dùng ẩn rail. */
+export function DesktopSidebar({ hidden = false }: { hidden?: boolean }) {
   return (
-    <aside className="hidden w-60 shrink-0 border-r border-sidebar-border bg-sidebar md:flex md:flex-col">
+    <aside
+      className={cn(
+        "hidden w-72 shrink-0 border-r border-sidebar-border bg-sidebar md:flex-col",
+        hidden ? "md:hidden" : "md:flex",
+      )}
+    >
       <div className="flex h-14 items-center border-b border-sidebar-border px-2">
         <Brand />
       </div>

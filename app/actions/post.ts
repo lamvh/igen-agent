@@ -7,7 +7,7 @@
  * - saveCaption: lưu chỉnh sửa caption + hashtags thủ công (cũng dùng khi thiếu API key).
  */
 import { revalidatePath } from "next/cache";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { asset, idea, post, type Idea, type Post } from "@/db/schema";
 import { getBrand } from "@/app/actions/brand";
@@ -32,18 +32,62 @@ export type IdeaPostLink = { id: number; platform: string | null };
 /** Ý tưởng kèm tags đã parse + các post đã tạo từ nó (cho link tới editor). */
 export type IdeaView = Omit<Idea, "tags"> & { tags: string[]; posts: IdeaPostLink[] };
 
-/** Ý tưởng của brand hiện tại (mới nhất trước). [] nếu chưa có brand. */
-export async function listIdeas(): Promise<IdeaView[]> {
+/** Bộ lọc + phân trang cho danh sách ý tưởng (dùng cho cả SSR lẫn infinite scroll). */
+export type IdeaFilter = {
+  tag?: string;
+  pillar?: string;
+  /** Từ khóa lọc theo tiêu đề (LIKE, không phân biệt hoa thường). */
+  search?: string;
+  limit?: number;
+  offset?: number;
+};
+
+/** Một "trang" ý tưởng + cờ còn dữ liệu để infinite scroll biết có nên tải tiếp. */
+export type IdeaPage = { items: IdeaView[]; hasMore: boolean };
+
+const IDEA_PAGE_SIZE = 20;
+
+/**
+ * Ý tưởng của brand hiện tại (mới nhất trước), có lọc + phân trang.
+ * - tag: khớp khi JSON text idea.tags chứa "tag" (đủ cho single-user local).
+ * - pillar: khớp tuyệt đối idea.pillar.
+ * - search: LIKE trên idea.title.
+ * Trả {items, hasMore}; rỗng nếu chưa có brand.
+ */
+export async function listIdeas(filter: IdeaFilter = {}): Promise<IdeaPage> {
   const brand = await getBrand();
-  if (!brand) return [];
+  if (!brand) return { items: [], hasMore: false };
+
+  const limit = filter.limit ?? IDEA_PAGE_SIZE;
+  const offset = filter.offset ?? 0;
+
+  // LIKE cần escape ký tự đặc biệt để khớp đúng nghĩa đen.
+  const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+  const conditions: SQL[] = [eq(idea.brandId, brand.id)];
+  if (filter.pillar) conditions.push(eq(idea.pillar, filter.pillar));
+  if (filter.search?.trim()) {
+    conditions.push(like(idea.title, `%${escapeLike(filter.search.trim())}%`));
+  }
+  if (filter.tag?.trim()) {
+    // tags lưu JSON array dạng text: ["a","b"] → tìm phần tử "tag".
+    conditions.push(like(idea.tags, `%${escapeLike(JSON.stringify(filter.tag.trim()))}%`));
+  }
+
+  // Lấy limit+1 để biết còn trang sau mà không cần count toàn bảng.
   const rows = await db
     .select()
     .from(idea)
-    .where(eq(idea.brandId, brand.id))
-    .orderBy(desc(idea.id));
+    .where(and(...conditions))
+    .orderBy(desc(idea.id))
+    .limit(limit + 1)
+    .offset(offset);
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
 
   // Gom post của các ý tưởng bằng 1 query (tránh N+1), rồi nhóm theo ideaId.
-  const ideaIds = rows.map((r) => r.id);
+  const ideaIds = pageRows.map((r) => r.id);
   const postRows = ideaIds.length
     ? await db
         .select({ id: post.id, platform: post.platform, ideaId: post.ideaId })
@@ -59,11 +103,12 @@ export async function listIdeas(): Promise<IdeaView[]> {
     postsByIdea.set(p.ideaId, list);
   }
 
-  return rows.map((r) => ({
+  const items = pageRows.map((r) => ({
     ...r,
     tags: parseJsonArray<string>(r.tags),
     posts: postsByIdea.get(r.id) ?? [],
   }));
+  return { items, hasMore };
 }
 
 function toView(row: Post, ideaTitle: string | null): PostView {
