@@ -1,14 +1,15 @@
 /**
  * Trang Nội dung (/posts) — Server Component.
  * Danh sách tất cả post (nháp/đã lên lịch/đã đăng), mới nhất trước,
- * lọc theo trạng thái + nền tảng. Click để mở trình soạn.
+ * lọc theo trạng thái + nền tảng. Các bài cùng một ý tưởng được gom thành 1 nhóm
+ * (1 chủ đề có nhiều mạng xã hội → 1 nhóm, mỗi bài vẫn là 1 dòng riêng).
+ * Click để mở trình soạn.
  */
 import Link from "next/link";
 import Image from "next/image";
-import { listAllPosts, deletePost } from "@/app/actions/post";
+import { listAllPosts, deletePost, type PostListItem } from "@/app/actions/post";
 import { POST_STATUSES, type PostStatus } from "@/lib/post-status";
 import { PLATFORMS, PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
-import { dateKey } from "@/lib/date";
 import { DeleteButton } from "@/components/shell/delete-button";
 
 export const metadata = { title: "Nội dung" };
@@ -21,11 +22,6 @@ const STATUS_LABEL: Record<PostStatus, string> = {
   scheduled: "Đã lên lịch",
   posted: "Đã đăng",
 };
-const STATUS_COLOR: Record<string, string> = {
-  draft: "bg-amber-100 text-amber-700",
-  scheduled: "bg-sky-100 text-sky-700",
-  posted: "bg-green-100 text-green-700",
-};
 const PLATFORM_COLOR: Record<string, string> = {
   facebook: "bg-blue-100 text-blue-700",
   instagram: "bg-pink-100 text-pink-700",
@@ -34,12 +30,44 @@ const PLATFORM_COLOR: Record<string, string> = {
 
 type Search = { status?: string; platform?: string };
 
+/**
+ * Nhóm các bài cùng ý tưởng thành 1 item gọn.
+ * Bài không có ideaId đứng riêng (mỗi bài là 1 nhóm độc lập).
+ */
+type PostGroup = { key: string; ideaId: number | null; ideaTitle: string | null; posts: PostListItem[] };
+
+function groupByIdea(posts: PostListItem[]): PostGroup[] {
+  const groups: PostGroup[] = [];
+  const byIdea = new Map<number, PostGroup>();
+  // posts đã desc theo id → nhóm xuất hiện theo thứ tự bài mới nhất.
+  for (const p of posts) {
+    if (p.ideaId == null) {
+      groups.push({ key: `post-${p.id}`, ideaId: null, ideaTitle: null, posts: [p] });
+      continue;
+    }
+    let g = byIdea.get(p.ideaId);
+    if (!g) {
+      g = { key: `idea-${p.ideaId}`, ideaId: p.ideaId, ideaTitle: p.ideaTitle, posts: [] };
+      byIdea.set(p.ideaId, g);
+      groups.push(g);
+    }
+    g.posts.push(p);
+  }
+  return groups;
+}
+
+/** Các nền tảng khác nhau trong nhóm, giữ thứ tự xuất hiện. */
+function platformsOf(posts: PostListItem[]): string[] {
+  return [...new Set(posts.map((p) => p.platform))];
+}
+
 export default async function PostsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
   const status = POST_STATUSES.includes(sp.status as PostStatus) ? (sp.status as PostStatus) : undefined;
   const platform = PLATFORMS.includes(sp.platform as Platform) ? (sp.platform as Platform) : undefined;
 
   const posts = await listAllPosts({ status, platform });
+  const groups = groupByIdea(posts);
 
   const chip = (active: boolean) =>
     `rounded-lg border px-2.5 py-1 ${active ? "bg-muted font-medium" : "hover:bg-muted"}`;
@@ -57,7 +85,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
       <p className="mb-6 text-sm text-muted-foreground">
-        Tất cả caption đã tạo (gồm bản nháp). Click để mở trình soạn.
+        Caption đã tạo, gom theo chủ đề. Click để mở trình soạn.
       </p>
 
       <div className="mb-3 flex flex-wrap gap-2 text-xs">
@@ -91,54 +119,60 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
         </p>
       ) : (
         <ul className="space-y-3">
-          {posts.map((p) => (
-            <li key={p.id} className="relative">
-              {/* Nút xóa đặt ngoài Link (không lồng button trong anchor). */}
-              <div className="absolute right-2 top-2 z-10">
-                <DeleteButton
-                  action={async () => {
-                    "use server";
-                    return deletePost(p.id);
-                  }}
-                  title="Xóa caption này?"
-                  description="Caption sẽ bị xóa vĩnh viễn. Ảnh trong thư viện không bị ảnh hưởng."
-                />
-              </div>
-              <Link
-                href={`/editor/${p.id}`}
-                className="flex gap-3 rounded-lg border p-3 pr-12 transition-colors hover:bg-muted/50"
-              >
-                {p.thumbnailPath ? (
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded">
-                    <Image src={p.thumbnailPath} alt="" fill sizes="56px" className="object-cover" unoptimized />
-                  </div>
-                ) : (
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded bg-muted text-[10px] text-muted-foreground">
-                    Không ảnh
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1 text-[11px]">
-                    <span className={`rounded px-1 py-0.5 ${PLATFORM_COLOR[p.platform] ?? "bg-muted"}`}>
-                      {PLATFORM_LABELS[p.platform as Platform] ?? p.platform}
-                    </span>
-                    <span className={`rounded px-1 py-0.5 ${STATUS_COLOR[p.status] ?? "bg-muted"}`}>
-                      {STATUS_LABEL[p.status as PostStatus] ?? p.status}
-                    </span>
-                    {p.scheduledDate && (
-                      <span className="text-muted-foreground">
-                        · {dateKey(new Date(p.scheduledDate))}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-sm">{p.caption || "(chưa có caption)"}</p>
-                  {p.ideaTitle && (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">Ý tưởng: {p.ideaTitle}</p>
-                  )}
+          {groups.map((g) => {
+            // Bài đại diện = bài mới nhất (đầu nhóm) → caption + ảnh hiển thị,
+            // và click cả item mở thẳng editor bài này.
+            const lead = g.posts[0];
+            const platforms = platformsOf(g.posts);
+            return (
+              <li key={g.key} className="relative">
+                {/* Xóa bài đại diện ngay tại item (bài khác cùng chủ đề xóa trong editor). */}
+                <div className="absolute right-2 top-2 z-10">
+                  <DeleteButton
+                    action={async () => {
+                      "use server";
+                      return deletePost(lead.id);
+                    }}
+                    title="Xóa caption này?"
+                    description="Caption sẽ bị xóa vĩnh viễn. Ảnh trong thư viện không bị ảnh hưởng."
+                  />
                 </div>
-              </Link>
-            </li>
-          ))}
+                <Link
+                  href={`/editor/${lead.id}`}
+                  className="flex gap-3 rounded-lg border p-3 pr-12 transition-colors hover:bg-muted/50"
+                >
+                  {lead.thumbnailPath ? (
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded">
+                      <Image src={lead.thumbnailPath} alt="" fill sizes="56px" className="object-cover" unoptimized />
+                    </div>
+                  ) : (
+                    <div className="grid h-14 w-14 shrink-0 place-items-center rounded bg-muted text-[10px] text-muted-foreground">
+                      Không ảnh
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    {/* Tiêu đề chủ đề (nếu có) làm dòng chính của item. */}
+                    {g.ideaTitle && (
+                      <p className="truncate text-sm font-semibold">{g.ideaTitle}</p>
+                    )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[11px]">
+                      {platforms.map((pl) => (
+                        <span key={pl} className={`rounded px-1 py-0.5 ${PLATFORM_COLOR[pl] ?? "bg-muted"}`}>
+                          {PLATFORM_LABELS[pl as Platform] ?? pl}
+                        </span>
+                      ))}
+                      <span className="text-muted-foreground">
+                        · {g.posts.length} bài
+                      </span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {lead.caption || "(chưa có caption)"}
+                    </p>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
