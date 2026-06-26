@@ -13,6 +13,8 @@ export const brandSchema = z.object({
   // pillars gửi từ form dưới dạng nhiều field cùng tên "pillar";
   // server gom thành mảng rồi loại phần tử rỗng.
   pillars: z.array(z.string().trim().min(1)).default([]),
+  // Danh sách tag định sẵn để phân loại ý tưởng; gửi như nhiều field "tag".
+  tags: z.array(z.string().trim().min(1)).default([]),
 });
 
 export type BrandInput = z.infer<typeof brandSchema>;

@@ -3,9 +3,10 @@
  * Grid ảnh đã upload + form upload + nút sinh AI (disable khi thiếu key).
  */
 import Image from "next/image";
-import { listAssets } from "@/app/actions/asset";
+import { listAssets, deleteAsset } from "@/app/actions/asset";
 import { hasGeminiKey } from "@/lib/ai/gemini-client";
 import { UploadForm } from "./upload-form";
+import { DeleteButton } from "@/components/shell/delete-button";
 
 export const metadata = { title: "Thư viện ảnh" };
 
@@ -29,7 +30,7 @@ export default async function AssetsPage() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {assets.map((a) => (
-            <div key={a.id} className="relative aspect-square overflow-hidden rounded-lg border">
+            <div key={a.id} className="group relative aspect-square overflow-hidden rounded-lg border">
               <Image
                 src={a.path}
                 alt={a.prompt ?? `Ảnh ${a.id}`}
@@ -38,6 +39,17 @@ export default async function AssetsPage() {
                 className="object-cover"
                 unoptimized
               />
+              {/* Nút xóa nổi góc phải, rõ hơn khi hover. */}
+              <div className="absolute right-1 top-1 rounded-md bg-background/80 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                <DeleteButton
+                  action={async () => {
+                    "use server";
+                    return deleteAsset(a.id);
+                  }}
+                  title="Xóa ảnh này?"
+                  description="Ảnh sẽ bị xóa khỏi thư viện và gỡ khỏi các bài đang dùng."
+                />
+              </div>
             </div>
           ))}
         </div>

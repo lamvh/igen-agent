@@ -5,9 +5,11 @@
  * Chọn pillar + nền tảng → sinh ý tưởng. Ẩn nút generate nếu thiếu API key.
  */
 import { useActionState } from "react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import { generateIdeas, type GenerateState } from "@/app/actions/generate";
 import {
   PLATFORMS,
@@ -18,7 +20,7 @@ import {
   type IdeaGoal,
 } from "@/lib/ai/prompts";
 
-const COUNT_OPTIONS = [3, 5, 6, 8, 10];
+const COUNT_OPTIONS = [1, 2, 3, 5, 6, 8, 10];
 const selectClass =
   "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm";
 
@@ -44,7 +46,12 @@ export function IdeasGenerator({
   }
 
   return (
-    <form action={formAction} className="space-y-4 rounded-lg border p-4">
+    <form action={formAction} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
+      <div className="flex items-center gap-2 border-b pb-3">
+        <Sparkles className="size-4 text-primary" />
+        <h2 className="font-heading text-sm font-semibold">Sinh ý tưởng bằng AI</h2>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="pillar">Content pillar</Label>
@@ -123,8 +130,9 @@ export function IdeasGenerator({
         Để trống đối tượng/tông giọng sẽ dùng thông tin từ Brand Profile.
       </p>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-t pt-4">
         <Button type="submit" disabled={pending}>
+          {pending ? <Spinner /> : <Sparkles className="size-4" />}
           {pending ? "Đang sinh…" : "Sinh ý tưởng"}
         </Button>
         {state.message && (

@@ -9,7 +9,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { db } from "@/db";
 import { idea, post } from "@/db/schema";
@@ -19,22 +19,26 @@ import {
   ideaPrompt,
   outlinePrompt,
   captionPrompt,
+  imagePromptPrompt,
   PLATFORMS,
   type Platform,
   type IdeaLength,
   type IdeaGoal,
+  type CaptionLength,
 } from "@/lib/ai/prompts";
 import {
   ideaListSchema,
   ideaOutlineSchema,
   captionSchema,
+  imagePromptSchema,
   formatOutline,
 } from "@/lib/validations/generate";
 import { serializeJsonArray } from "@/lib/json";
+import { logUsage } from "@/lib/ai/usage";
 
 // Ràng buộc số lượng ý tưởng — chặn giá trị bất thường từ form.
 const IDEA_COUNT_DEFAULT = 6;
-const IDEA_COUNT_MIN = 3;
+const IDEA_COUNT_MIN = 1;
 const IDEA_COUNT_MAX = 10;
 const TEXT_MAX = 200; // giới hạn độ dài ô target/tone để prompt không phình.
 
@@ -114,6 +118,7 @@ export async function generateIdeas(_prev: GenerateState, formData: FormData): P
       messages: [{ role: "user", content: ideaPrompt(brand, pillar, platform, opts) }],
     });
 
+    await logUsage("ideas", result.usage);
     const ideas = (result.parsed_output?.ideas ?? []).map((t) => t.trim()).filter(Boolean);
     if (!ideas.length) {
       return { success: false, message: "Không sinh được ý tưởng, vui lòng thử lại." };
@@ -129,6 +134,64 @@ export async function generateIdeas(_prev: GenerateState, formData: FormData): P
 
   revalidatePath("/ideas");
   return { success: true, message: `Đã sinh ${savedCount} ý tưởng.` };
+}
+
+/** Gọi Claude sinh 1 image-generation prompt từ nội dung cho trước; null nếu lỗi. */
+async function buildImagePrompt(content: string, platform: Platform): Promise<string | null> {
+  const brand = await getBrand();
+  if (!brand) return null;
+  try {
+    const client = getClaudeClient();
+    const result = await client.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      output_config: { effort: "low", format: zodOutputFormat(imagePromptSchema) },
+      messages: [{ role: "user", content: imagePromptPrompt(brand, content, platform) }],
+    });
+    await logUsage("caption", result.usage);
+    return result.parsed_output?.prompt?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Tạo prompt ảnh (tiếng Anh) cho 1 ý tưởng — dựa trên tiêu đề + dàn ý nếu có.
+ * Lưu vào idea.imagePrompt để copy dán sang Gemini sau (chưa tích hợp Gemini trực tiếp).
+ */
+export async function generateImagePromptForIdea(ideaId: number): Promise<GenerateState> {
+  if (!hasApiKey()) return NO_KEY;
+  if (!(await getBrand())) return NO_BRAND;
+
+  const rows = await db.select().from(idea).where(eq(idea.id, ideaId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
+
+  const content = current.outline ? `${current.title}\n\n${current.outline}` : current.title;
+  const prompt = await buildImagePrompt(content, toPlatform(current.platform));
+  if (!prompt) return { success: false, message: "Tạo prompt ảnh thất bại, vui lòng thử lại." };
+
+  await db.update(idea).set({ imagePrompt: prompt }).where(eq(idea.id, ideaId));
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã tạo prompt ảnh." };
+}
+
+/** Tạo prompt ảnh cho 1 post — dựa trên caption hiện tại. Lưu vào post.imagePrompt. */
+export async function generateImagePromptForPost(postId: number): Promise<GenerateState> {
+  if (!hasApiKey()) return NO_KEY;
+  if (!(await getBrand())) return NO_BRAND;
+
+  const rows = await db.select().from(post).where(eq(post.id, postId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy post." };
+
+  const content = current.caption?.trim() || "(chưa có caption)";
+  const prompt = await buildImagePrompt(content, toPlatform(current.platform));
+  if (!prompt) return { success: false, message: "Tạo prompt ảnh thất bại, vui lòng thử lại." };
+
+  await db.update(post).set({ imagePrompt: prompt }).where(eq(post.id, postId));
+  revalidatePath(`/editor/${postId}`);
+  return { success: true, message: "Đã tạo prompt ảnh." };
 }
 
 /**
@@ -157,6 +220,7 @@ export async function generateOutline(ideaId: number): Promise<GenerateState> {
       output_config: { effort: "low", format: zodOutputFormat(ideaOutlineSchema) },
       messages: [{ role: "user", content: outlinePrompt(brand, current.title, platform) }],
     });
+    await logUsage("outline", result.usage);
     const parsed = result.parsed_output;
     if (!parsed) return { success: false, message: "Không tạo được dàn ý, vui lòng thử lại." };
     outlineText = formatOutline(parsed);
@@ -169,60 +233,173 @@ export async function generateOutline(ideaId: number): Promise<GenerateState> {
   return { success: true, message: "Đã tạo dàn ý." };
 }
 
-/**
- * Từ 1 ý tưởng sinh caption cho cả 3 nền tảng, tạo 3 post draft, rồi redirect tới editor post đầu.
- * Nếu ý tưởng đã có dàn ý → caption bám theo dàn ý đó.
- * Nhận ideaId qua bind. Trả GenerateState nếu lỗi (redirect xảy ra khi thành công).
- */
-export async function generateCaption(ideaId: number): Promise<GenerateState> {
-  if (!hasApiKey()) return NO_KEY;
-
+/** Gọi Claude sinh caption + hashtags cho 1 nền tảng từ 1 ý tưởng; null nếu lỗi. */
+async function buildCaptionValue(
+  idea_: typeof idea.$inferSelect,
+  platform: Platform,
+  length: CaptionLength = "medium",
+): Promise<{ caption: string; hashtags: string[] } | null> {
   const brand = await getBrand();
-  if (!brand) return NO_BRAND;
+  if (!brand) return null;
+  try {
+    const client = getClaudeClient();
+    const result = await client.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: 2048,
+      output_config: { effort: "medium", format: zodOutputFormat(captionSchema) },
+      messages: [
+        {
+          role: "user",
+          content: captionPrompt(brand, idea_.title, platform, idea_.outline, length),
+        },
+      ],
+    });
+    await logUsage("caption", result.usage);
+    const caption = result.parsed_output?.caption?.trim() ?? "";
+    if (!caption) return null;
+    const hashtags = (result.parsed_output?.hashtags ?? []).map((h) => h.trim()).filter(Boolean);
+    return { caption, hashtags };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Từ 1 ý tưởng sinh caption cho ĐÚNG 1 nền tảng (mặc định facebook để tiết kiệm token),
+ * tạo 1 post draft rồi redirect tới editor. Bám dàn ý nếu có. IG/TikTok sinh sau trong editor.
+ */
+export async function generateCaption(
+  ideaId: number,
+  platform: Platform = "facebook",
+  length: CaptionLength = "medium",
+): Promise<GenerateState> {
+  if (!hasApiKey()) return NO_KEY;
+  if (!(await getBrand())) return NO_BRAND;
+
+  const target = PLATFORMS.includes(platform) ? platform : "facebook";
+  const rows = await db.select().from(idea).where(eq(idea.id, ideaId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
+
+  const built = await buildCaptionValue(current, target, length);
+  if (!built) return { success: false, message: "Sinh caption thất bại, vui lòng thử lại." };
+
+  const newId = db.transaction((tx) => {
+    const ids = tx
+      .insert(post)
+      .values({
+        ideaId: current.id,
+        platform: target,
+        caption: built.caption,
+        hashtags: serializeJsonArray(built.hashtags),
+        status: "draft",
+      })
+      .returning({ id: post.id })
+      .all();
+    return ids[0]?.id ?? null;
+  });
+
+  if (newId === null) return { success: false, message: "Không tạo được caption, vui lòng thử lại." };
+
+  revalidatePath("/ideas");
+  redirect(`/editor/${newId}`);
+}
+
+/**
+ * Sinh caption cho 1 nền tảng CHƯA có post của ý tưởng (dùng trong editor — tab on-demand).
+ * Tạo post mới cùng ideaId; trả về (không redirect) để editor refresh tại chỗ.
+ * Nếu nền tảng đó đã có post → trả lỗi để tránh trùng.
+ */
+export async function generateCaptionForPlatform(
+  ideaId: number,
+  platform: Platform,
+  length: CaptionLength = "medium",
+): Promise<GenerateState> {
+  if (!hasApiKey()) return NO_KEY;
+  if (!(await getBrand())) return NO_BRAND;
+  if (!PLATFORMS.includes(platform)) {
+    return { success: false, message: "Nền tảng không hợp lệ." };
+  }
 
   const rows = await db.select().from(idea).where(eq(idea.id, ideaId)).limit(1);
   const current = rows[0];
   if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
 
-  // Sinh caption cho cả 3 nền tảng TRƯỚC, rồi insert một lần trong transaction
-  // → tránh post mồ côi nếu một lời gọi Claude lỗi giữa chừng (atomic all-or-nothing).
-  let values: (typeof post.$inferInsert)[];
+  // Chặn trùng: nếu nền tảng này đã có post cho ý tưởng thì không sinh nữa.
+  const existing = await db
+    .select({ id: post.id })
+    .from(post)
+    .where(and(eq(post.ideaId, ideaId), eq(post.platform, platform)))
+    .limit(1);
+  if (existing[0]) return { success: false, message: "Nền tảng này đã có nội dung." };
+
+  const built = await buildCaptionValue(current, platform, length);
+  if (!built) return { success: false, message: "Sinh caption thất bại, vui lòng thử lại." };
+
   try {
-    const client = getClaudeClient();
-    values = await Promise.all(
-      PLATFORMS.map(async (platform) => {
-        const result = await client.messages.parse({
-          model: CLAUDE_MODEL,
-          max_tokens: 2048,
-          output_config: { effort: "medium", format: zodOutputFormat(captionSchema) },
-          messages: [
-            { role: "user", content: captionPrompt(brand, current.title, platform, current.outline) },
-          ],
-        });
-        const caption = result.parsed_output?.caption?.trim() ?? "";
-        const hashtags = (result.parsed_output?.hashtags ?? []).map((h) => h.trim()).filter(Boolean);
-        return {
-          ideaId: current.id,
-          platform,
-          caption,
-          hashtags: serializeJsonArray(hashtags),
-          status: "draft",
-        };
-      }),
-    );
+    await db.insert(post).values({
+      ideaId: current.id,
+      platform,
+      caption: built.caption,
+      hashtags: serializeJsonArray(built.hashtags),
+      status: "draft",
+    });
   } catch {
-    return { success: false, message: "Sinh caption thất bại, vui lòng thử lại." };
-  }
-
-  const firstPostId = db.transaction((tx) => {
-    const ids = tx.insert(post).values(values).returning({ id: post.id }).all();
-    return ids[0]?.id ?? null;
-  });
-
-  if (firstPostId === null) {
     return { success: false, message: "Không tạo được caption, vui lòng thử lại." };
   }
 
   revalidatePath("/ideas");
-  redirect(`/editor/${firstPostId}`);
+  return { success: true, message: "Đã tạo nội dung." };
+}
+
+/**
+ * Viết lại caption + hashtags cho ĐÚNG 1 post đang sửa (không tạo post mới).
+ * Bám dàn ý của ý tưởng nếu có. Ghi đè caption/hashtags hiện tại.
+ */
+export async function regenerateCaption(postId: number): Promise<GenerateState> {
+  if (!hasApiKey()) return NO_KEY;
+
+  const brand = await getBrand();
+  if (!brand) return NO_BRAND;
+
+  const rows = await db.select().from(post).where(eq(post.id, postId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy post." };
+
+  // Lấy tiêu đề + dàn ý từ ý tưởng gốc (nếu post còn liên kết idea).
+  let ideaTitle = "";
+  let outline: string | null = null;
+  if (current.ideaId) {
+    const ir = await db.select().from(idea).where(eq(idea.id, current.ideaId)).limit(1);
+    ideaTitle = ir[0]?.title ?? "";
+    outline = ir[0]?.outline ?? null;
+  }
+
+  const platform = toPlatform(current.platform);
+
+  try {
+    const client = getClaudeClient();
+    const result = await client.messages.parse({
+      model: CLAUDE_MODEL,
+      max_tokens: 2048,
+      output_config: { effort: "medium", format: zodOutputFormat(captionSchema) },
+      messages: [
+        { role: "user", content: captionPrompt(brand, ideaTitle || "(nội dung tự do)", platform, outline) },
+      ],
+    });
+    await logUsage("caption", result.usage);
+    const caption = result.parsed_output?.caption?.trim() ?? "";
+    const hashtags = (result.parsed_output?.hashtags ?? []).map((h) => h.trim()).filter(Boolean);
+    if (!caption) return { success: false, message: "Không sinh được caption, vui lòng thử lại." };
+
+    await db
+      .update(post)
+      .set({ caption, hashtags: serializeJsonArray(hashtags) })
+      .where(eq(post.id, postId));
+  } catch {
+    return { success: false, message: "Viết lại caption thất bại, vui lòng thử lại." };
+  }
+
+  revalidatePath(`/editor/${postId}`);
+  return { success: true, message: "Đã viết lại caption." };
 }

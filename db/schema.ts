@@ -23,6 +23,8 @@ export const brand = sqliteTable("brand", {
   toneOfVoice: text("tone_of_voice").notNull().default(""),
   audience: text("audience").notNull().default(""),
   pillars: text("pillars").notNull().default("[]"), // JSON text: string[]
+  // Danh sách tag định sẵn để phân loại ý tưởng (quản lý ở Brand Profile).
+  tags: text("tags").notNull().default("[]"), // JSON text: string[]
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -36,8 +38,12 @@ export const idea = sqliteTable("idea", {
   title: text("title").notNull(),
   // Dàn ý chi tiết triển khai từ title (bước 2 của quy trình); null nếu chưa tạo.
   outline: text("outline"),
+  // Prompt (tiếng Anh) để tạo ảnh bằng Gemini/Nano Banana; null nếu chưa tạo.
+  imagePrompt: text("image_prompt"),
   pillar: text("pillar"),
   platform: text("platform"), // 'facebook' | 'instagram' | 'tiktok'
+  // Tag thủ công gán cho ý tưởng (chọn từ brand.tags) để phân loại/lọc.
+  tags: text("tags").notNull().default("[]"), // JSON text: string[]
   status: text("status").notNull().default("draft"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
@@ -50,9 +56,26 @@ export const post = sqliteTable("post", {
   platform: text("platform").notNull(), // 'facebook' | 'instagram' | 'tiktok'
   caption: text("caption").notNull().default(""),
   hashtags: text("hashtags").notNull().default("[]"), // JSON text: string[]
+  // Prompt (tiếng Anh) để tạo ảnh bằng Gemini/Nano Banana; null nếu chưa tạo.
+  imagePrompt: text("image_prompt"),
   scheduledDate: integer("scheduled_date", { mode: "timestamp" }),
   status: text("status").notNull().default("draft"), // draft | scheduled | posted
   assetIds: text("asset_ids").notNull().default("[]"), // JSON text: number[]
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
+/**
+ * Nhật ký token mỗi lần gọi Claude — để ước tính chi phí đã tiêu TRONG app.
+ * Không phản ánh số dư tài khoản (Anthropic không có API số dư); chỉ là tổng usage cục bộ.
+ */
+export const usageLog = sqliteTable("usage_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  model: text("model").notNull(),
+  kind: text("kind").notNull(), // 'ideas' | 'outline' | 'caption'
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
@@ -74,3 +97,4 @@ export type NewBrand = typeof brand.$inferInsert;
 export type Idea = typeof idea.$inferSelect;
 export type Post = typeof post.$inferSelect;
 export type Asset = typeof asset.$inferSelect;
+export type UsageLog = typeof usageLog.$inferSelect;

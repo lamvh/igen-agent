@@ -26,11 +26,19 @@ export type PostListItem = Omit<Post, "hashtags"> & {
 
 export type SaveCaptionState = { success: boolean; message: string };
 
+/** Ý tưởng kèm tags đã parse (JSON text → string[]) cho client. */
+export type IdeaView = Omit<Idea, "tags"> & { tags: string[] };
+
 /** Ý tưởng của brand hiện tại (mới nhất trước). [] nếu chưa có brand. */
-export async function listIdeas(): Promise<Idea[]> {
+export async function listIdeas(): Promise<IdeaView[]> {
   const brand = await getBrand();
   if (!brand) return [];
-  return db.select().from(idea).where(eq(idea.brandId, brand.id)).orderBy(desc(idea.id));
+  const rows = await db
+    .select()
+    .from(idea)
+    .where(eq(idea.brandId, brand.id))
+    .orderBy(desc(idea.id));
+  return rows.map((r) => ({ ...r, tags: parseJsonArray<string>(r.tags) }));
 }
 
 function toView(row: Post, ideaTitle: string | null): PostView {
@@ -58,6 +66,18 @@ export async function getSiblingPosts(ideaId: number): Promise<Pick<Post, "id" |
     .from(post)
     .where(eq(post.ideaId, ideaId))
     .orderBy(asc(post.id));
+}
+
+/** Tất cả post (full view) của 1 ý tưởng — cho editor 3 tab. Hashtags đã parse. */
+export async function getIdeaPosts(ideaId: number): Promise<PostView[]> {
+  const rows = await db.select().from(post).where(eq(post.ideaId, ideaId)).orderBy(asc(post.id));
+  // Mọi post cùng ý tưởng nên ideaTitle giống nhau — lấy 1 lần.
+  let ideaTitle: string | null = null;
+  if (rows[0]) {
+    const ir = await db.select({ title: idea.title }).from(idea).where(eq(idea.id, ideaId)).limit(1);
+    ideaTitle = ir[0]?.title ?? null;
+  }
+  return rows.map((r) => toView(r, ideaTitle));
 }
 
 /**
@@ -131,4 +151,56 @@ export async function saveCaption(_prev: SaveCaptionState, formData: FormData): 
 
   revalidatePath(`/editor/${postId}`);
   return { success: true, message: "Đã lưu caption." };
+}
+
+export type DeleteState = { success: boolean; message: string };
+
+/** Gán danh sách tag cho 1 ý tưởng (thay thế toàn bộ tags hiện có). */
+export async function updateIdeaTags(ideaId: number, tags: string[]): Promise<DeleteState> {
+  if (!Number.isInteger(ideaId) || ideaId <= 0) {
+    return { success: false, message: "Ý tưởng không hợp lệ." };
+  }
+  const clean = tags.map((t) => t.trim()).filter(Boolean);
+  try {
+    await db.update(idea).set({ tags: serializeJsonArray(clean) }).where(eq(idea.id, ideaId));
+  } catch {
+    return { success: false, message: "Cập nhật tag thất bại." };
+  }
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã cập nhật tag." };
+}
+
+/**
+ * Xóa 1 ý tưởng. Các post sinh từ ý tưởng này được GIỮ LẠI — chỉ gỡ liên kết
+ * (post.ideaId = null) để không phá ràng buộc khóa ngoại và không mất nội dung.
+ */
+export async function deleteIdea(ideaId: number): Promise<DeleteState> {
+  if (!Number.isInteger(ideaId) || ideaId <= 0) {
+    return { success: false, message: "Ý tưởng không hợp lệ." };
+  }
+  try {
+    db.transaction((tx) => {
+      tx.update(post).set({ ideaId: null }).where(eq(post.ideaId, ideaId)).run();
+      tx.delete(idea).where(eq(idea.id, ideaId)).run();
+    });
+  } catch {
+    return { success: false, message: "Xóa ý tưởng thất bại, vui lòng thử lại." };
+  }
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã xóa ý tưởng." };
+}
+
+/** Xóa 1 post (caption). Không xóa ảnh đính kèm (ảnh dùng chung trong thư viện). */
+export async function deletePost(postId: number): Promise<DeleteState> {
+  if (!Number.isInteger(postId) || postId <= 0) {
+    return { success: false, message: "Post không hợp lệ." };
+  }
+  try {
+    await db.delete(post).where(eq(post.id, postId));
+  } catch {
+    return { success: false, message: "Xóa post thất bại, vui lòng thử lại." };
+  }
+  revalidatePath("/posts");
+  revalidatePath("/calendar");
+  return { success: true, message: "Đã xóa post." };
 }

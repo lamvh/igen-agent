@@ -12,7 +12,7 @@ import { brand, type Brand } from "@/db/schema";
 import { brandSchema } from "@/lib/validations/brand";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
 
-export type BrandView = Omit<Brand, "pillars"> & { pillars: string[] };
+export type BrandView = Omit<Brand, "pillars" | "tags"> & { pillars: string[]; tags: string[] };
 
 export type BrandFormState = {
   success: boolean;
@@ -25,7 +25,11 @@ export async function getBrand(): Promise<BrandView | null> {
   const rows = await db.select().from(brand).orderBy(asc(brand.id)).limit(1);
   const row = rows[0];
   if (!row) return null;
-  return { ...row, pillars: parseJsonArray<string>(row.pillars) };
+  return {
+    ...row,
+    pillars: parseJsonArray<string>(row.pillars),
+    tags: parseJsonArray<string>(row.tags),
+  };
 }
 
 /** Tạo/cập nhật brand. Dùng làm action cho useActionState: (prevState, formData). */
@@ -37,6 +41,10 @@ export async function upsertBrand(
     .getAll("pillar")
     .map((v) => String(v).trim())
     .filter((v) => v.length > 0);
+  const tags = formData
+    .getAll("tag")
+    .map((v) => String(v).trim())
+    .filter((v) => v.length > 0);
 
   const parsed = brandSchema.safeParse({
     name: formData.get("name"),
@@ -45,6 +53,7 @@ export async function upsertBrand(
     toneOfVoice: formData.get("toneOfVoice") ?? "",
     audience: formData.get("audience") ?? "",
     pillars,
+    tags,
   });
 
   if (!parsed.success) {
@@ -63,6 +72,7 @@ export async function upsertBrand(
     toneOfVoice: data.toneOfVoice,
     audience: data.audience,
     pillars: serializeJsonArray(data.pillars),
+    tags: serializeJsonArray(data.tags),
   };
 
   try {

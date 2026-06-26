@@ -23,6 +23,11 @@ export const captionSchema = z.object({
   hashtags: z.array(z.string()),
 });
 
+/** Prompt tạo ảnh (tiếng Anh) cho Gemini/Nano Banana. */
+export const imagePromptSchema = z.object({
+  prompt: z.string(),
+});
+
 export type IdeaList = z.infer<typeof ideaListSchema>;
 export type IdeaOutline = z.infer<typeof ideaOutlineSchema>;
 export type CaptionResult = z.infer<typeof captionSchema>;

@@ -9,7 +9,7 @@
  * Lưu ý deploy: public/uploads không bền trên serverless → chuyển object storage ở Phase 6.
  */
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { desc, eq, inArray } from "drizzle-orm";
@@ -68,6 +68,52 @@ export async function getAssetsByIds(ids: number[]): Promise<Asset[]> {
   const rows = await db.select().from(asset).where(inArray(asset.id, ids));
   const byId = new Map(rows.map((r) => [r.id, r]));
   return ids.map((id) => byId.get(id)).filter((a): a is Asset => Boolean(a));
+}
+
+/**
+ * Xóa 1 ảnh: gỡ id khỏi mọi post đang dùng, xóa record DB, rồi xóa file vật lý.
+ * Xóa file đặt cuối + bỏ qua lỗi unlink (file có thể đã mất) để DB vẫn sạch.
+ */
+export async function deleteAsset(assetId: number): Promise<UploadState> {
+  if (!Number.isInteger(assetId) || assetId <= 0) {
+    return { success: false, message: "Ảnh không hợp lệ." };
+  }
+
+  let filePath: string | null = null;
+  try {
+    const rows = await db.select({ path: asset.path }).from(asset).where(eq(asset.id, assetId)).limit(1);
+    if (!rows[0]) return { success: false, message: "Không tìm thấy ảnh." };
+    filePath = rows[0].path;
+
+    // Gỡ assetId khỏi các post tham chiếu (assetIds là JSON number[] nên lọc trong app).
+    const usingPosts = await db.select({ id: post.id, assetIds: post.assetIds }).from(post);
+    db.transaction((tx) => {
+      for (const p of usingPosts) {
+        const ids = parseJsonArray<number>(p.assetIds);
+        if (ids.includes(assetId)) {
+          tx.update(post)
+            .set({ assetIds: serializeJsonArray(ids.filter((x) => x !== assetId)) })
+            .where(eq(post.id, p.id))
+            .run();
+        }
+      }
+      tx.delete(asset).where(eq(asset.id, assetId)).run();
+    });
+  } catch {
+    return { success: false, message: "Xóa ảnh thất bại, vui lòng thử lại." };
+  }
+
+  // Xóa file trong public/uploads; bỏ qua nếu file không tồn tại.
+  if (filePath?.startsWith("/uploads/")) {
+    try {
+      await unlink(path.join(process.cwd(), "public", filePath));
+    } catch {
+      /* file đã mất — không sao, DB đã sạch */
+    }
+  }
+
+  revalidatePath("/assets");
+  return { success: true, message: "Đã xóa ảnh." };
 }
 
 /** Gắn/bỏ gắn asset vào post.assetIds (toggle). */

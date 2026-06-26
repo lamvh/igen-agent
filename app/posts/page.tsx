@@ -5,10 +5,11 @@
  */
 import Link from "next/link";
 import Image from "next/image";
-import { listAllPosts } from "@/app/actions/post";
+import { listAllPosts, deletePost } from "@/app/actions/post";
 import { POST_STATUSES, type PostStatus } from "@/lib/post-status";
 import { PLATFORMS, PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
 import { dateKey } from "@/lib/date";
+import { DeleteButton } from "@/components/shell/delete-button";
 
 export const metadata = { title: "Nội dung" };
 
@@ -91,10 +92,21 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
       ) : (
         <ul className="space-y-3">
           {posts.map((p) => (
-            <li key={p.id}>
+            <li key={p.id} className="relative">
+              {/* Nút xóa đặt ngoài Link (không lồng button trong anchor). */}
+              <div className="absolute right-2 top-2 z-10">
+                <DeleteButton
+                  action={async () => {
+                    "use server";
+                    return deletePost(p.id);
+                  }}
+                  title="Xóa caption này?"
+                  description="Caption sẽ bị xóa vĩnh viễn. Ảnh trong thư viện không bị ảnh hưởng."
+                />
+              </div>
               <Link
                 href={`/editor/${p.id}`}
-                className="flex gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                className="flex gap-3 rounded-lg border p-3 pr-12 transition-colors hover:bg-muted/50"
               >
                 {p.thumbnailPath ? (
                   <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded">

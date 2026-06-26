@@ -27,9 +27,13 @@ function FieldError({ messages }: { messages?: string[] }) {
 export function BrandForm({ brand }: { brand: BrandView | null }) {
   const [state, formAction, pending] = useActionState(upsertBrand, initialState);
   const [pillars, setPillars] = useState<string[]>(brand?.pillars ?? []);
+  const [tags, setTags] = useState<string[]>(brand?.tags ?? []);
 
   function updatePillar(index: number, value: string) {
     setPillars((prev) => prev.map((p, i) => (i === index ? value : p)));
+  }
+  function updateTag(index: number, value: string) {
+    setTags((prev) => prev.map((t, i) => (i === index ? value : t)));
   }
 
   return (
@@ -96,6 +100,43 @@ export function BrandForm({ brand }: { brand: BrandView | null }) {
           >
             <Plus />
             Thêm pillar
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Tag phân loại</Label>
+        <p className="text-xs text-muted-foreground">
+          Danh sách tag dùng để gắn &amp; lọc ý tưởng (VD: Khuyến mãi, Đánh giá, Hướng dẫn).
+        </p>
+        <div className="space-y-2">
+          {tags.map((tag, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <Input
+                name="tag"
+                value={tag}
+                onChange={(e) => updateTag(i, e.target.value)}
+                placeholder="VD: Khuyến mãi"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Xóa tag"
+                onClick={() => setTags((prev) => prev.filter((_, idx) => idx !== i))}
+              >
+                <X />
+              </Button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setTags((prev) => [...prev, ""])}
+          >
+            <Plus />
+            Thêm tag
           </Button>
         </div>
       </div>

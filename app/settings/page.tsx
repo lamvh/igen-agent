@@ -4,6 +4,7 @@
  */
 import Link from "next/link";
 import { getKeyStatus } from "@/app/actions/settings";
+import { getUsageSummary } from "@/lib/ai/usage";
 import { ClaudeTestButton } from "./claude-test-button";
 
 export const metadata = { title: "Cài đặt" };
@@ -23,8 +24,17 @@ function StatusBadge({ ok }: { ok: boolean }) {
   );
 }
 
+// Định dạng số token có dấu phân cách nghìn (tiếng Việt).
+const fmtInt = new Intl.NumberFormat("vi-VN");
+const fmtUsd = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
 export default async function SettingsPage() {
-  const status = await getKeyStatus();
+  const [status, usage] = await Promise.all([getKeyStatus(), getUsageSummary()]);
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
@@ -51,6 +61,48 @@ export default async function SettingsPage() {
           <div className="mt-3">
             <ClaudeTestButton disabled={!status.anthropic} />
           </div>
+        </div>
+
+        {/* Mức sử dụng: token đã tiêu TRONG app + chi phí ước tính. */}
+        <div className="rounded-lg border p-4">
+          <h2 className="font-medium">Mức sử dụng (ước tính)</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Token Claude đã dùng trong app này và chi phí ước tính theo đơn giá Opus 4.8
+            ($5/$25 mỗi triệu token input/output).
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border p-3">
+              <div className="text-lg font-bold">{fmtInt.format(usage.totalInputTokens)}</div>
+              <div className="text-xs text-muted-foreground">Token input</div>
+            </div>
+            <div className="rounded-lg border p-3">
+              <div className="text-lg font-bold">{fmtInt.format(usage.totalOutputTokens)}</div>
+              <div className="text-xs text-muted-foreground">Token output</div>
+            </div>
+            <div className="rounded-lg border p-3">
+              <div className="text-lg font-bold">{usage.callCount}</div>
+              <div className="text-xs text-muted-foreground">Lượt gọi</div>
+            </div>
+            <div className="rounded-lg border border-primary/30 bg-accent/40 p-3">
+              <div className="text-lg font-bold text-primary">
+                {fmtUsd.format(usage.estimatedCostUsd)}
+              </div>
+              <div className="text-xs text-muted-foreground">Chi phí ước tính</div>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            ⚠️ Đây là chi phí đã tiêu trong app, <strong>không phải số dư còn lại</strong>.
+            Anthropic không cung cấp API số dư — xem số dư &amp; usage thật tại{" "}
+            <a
+              href="https://console.anthropic.com/settings/billing"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-primary underline"
+            >
+              Anthropic Console → Billing
+            </a>
+            .
+          </p>
         </div>
 
         <div className="rounded-lg border p-4">

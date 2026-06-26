@@ -14,28 +14,37 @@ export function AssetPicker({
   postId,
   assets,
   attachedIds,
+  onAttachedChange,
 }: {
   postId: number;
   assets: Asset[];
   attachedIds: number[];
+  /** Báo danh sách path ảnh đính kèm thay đổi (cho preview real-time). */
+  onAttachedChange?: (paths: string[]) => void;
 }) {
   const [attached, setAttached] = useState<number[]>(attachedIds);
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
 
+  // Map id → path để truyền path cho preview.
+  const pathById = new Map(assets.map((a) => [a.id, a.path]));
+  const notify = (ids: number[]) =>
+    onAttachedChange?.(ids.map((id) => pathById.get(id)).filter((p): p is string => Boolean(p)));
+
   function toggle(assetId: number) {
     // optimistic
-    setAttached((prev) =>
-      prev.includes(assetId) ? prev.filter((x) => x !== assetId) : [...prev, assetId],
-    );
+    const next = attached.includes(assetId)
+      ? attached.filter((x) => x !== assetId)
+      : [...attached, assetId];
+    setAttached(next);
+    notify(next);
     startTransition(async () => {
       const res = await attachAssetToPost(postId, assetId);
       if (!res.success) {
         setMessage(res.message);
         // rollback
-        setAttached((prev) =>
-          prev.includes(assetId) ? prev.filter((x) => x !== assetId) : [...prev, assetId],
-        );
+        setAttached(attached);
+        notify(attached);
       } else {
         setMessage("");
       }
