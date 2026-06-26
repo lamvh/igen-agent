@@ -58,3 +58,26 @@ export function appendOutlineVersion(
   });
   return serializeJsonArray(versions);
 }
+
+/**
+ * Khôi phục một phiên bản cũ làm bản đang dùng: di chuyển bản đó xuống cuối
+ * mảng (quy ước bản cuối = đang dùng) thay vì nhân bản — tránh trùng lịch sử.
+ * Trả null nếu không tìm thấy id.
+ */
+export function restoreOutlineVersionById(
+  currentJson: string | null | undefined,
+  versionId: string,
+): { content: string; json: string } | null {
+  const versions = parseOutlineVersions(currentJson);
+  const idx = versions.findIndex((v) => v.id === versionId);
+  if (idx === -1) return null;
+
+  const [target] = versions.splice(idx, 1);
+  versions.push(target);
+  return { content: target.content, json: serializeJsonArray(versions) };
+}
+
+/** Id của bản đang dùng (bản cuối mảng theo quy ước); null nếu rỗng. */
+export function activeVersionId(versions: OutlineVersion[]): string | null {
+  return versions.length > 0 ? versions[versions.length - 1].id : null;
+}

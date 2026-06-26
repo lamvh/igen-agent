@@ -17,6 +17,7 @@ import type { Platform } from "@/lib/ai/prompts";
 import {
   appendOutlineVersion,
   parseOutlineVersions,
+  restoreOutlineVersionById,
   type OutlineVersion,
 } from "@/lib/outline-versions";
 
@@ -296,17 +297,14 @@ export async function restoreOutlineVersion(
     .limit(1);
   if (!rows[0]) return { success: false, message: "Không tìm thấy ý tưởng." };
 
-  const versions = parseOutlineVersions(rows[0].outlineVersions);
-  const target = versions.find((v) => v.id === versionId);
-  if (!target) return { success: false, message: "Không tìm thấy phiên bản dàn ý." };
+  // Di chuyển bản được chọn xuống cuối (đánh dấu đang dùng) thay vì nhân bản.
+  const restored = restoreOutlineVersionById(rows[0].outlineVersions, versionId);
+  if (!restored) return { success: false, message: "Không tìm thấy phiên bản dàn ý." };
 
   try {
     await db
       .update(idea)
-      .set({
-        outline: target.content,
-        outlineVersions: appendOutlineVersion(rows[0].outlineVersions, target.content, "manual"),
-      })
+      .set({ outline: restored.content, outlineVersions: restored.json })
       .where(eq(idea.id, ideaId));
   } catch {
     return { success: false, message: "Khôi phục dàn ý thất bại." };

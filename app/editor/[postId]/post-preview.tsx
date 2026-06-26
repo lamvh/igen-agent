@@ -5,9 +5,13 @@
  * Render real-time từ caption + hashtags + ảnh đính kèm (ảnh Gemini đã upload).
  * Chỉ mô phỏng giao diện; không gọi API mạng xã hội.
  */
+import { useState } from "react";
 import Image from "next/image";
 import { Heart, MessageCircle, Send, Bookmark, ThumbsUp, Share2, Music2 } from "lucide-react";
 import type { Platform } from "@/lib/ai/prompts";
+
+// Ngưỡng ký tự trước khi caption bị cắt và hiện nút "Xem thêm" (giống Facebook).
+const COLLAPSE_LIMIT = 200;
 
 // Tỉ lệ khung ảnh theo chuẩn phổ biến từng nền tảng.
 const ASPECT: Record<Platform, string> = {
@@ -26,9 +30,32 @@ function Avatar({ name }: { name: string }) {
 }
 
 function CaptionText({ caption, hashtags }: { caption: string; hashtags: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  // Cắt caption khi vượt ngưỡng; cho phép mở rộng/thu gọn như Facebook.
+  const isLong = caption.length > COLLAPSE_LIMIT;
+  const shown = isLong && !expanded ? caption.slice(0, COLLAPSE_LIMIT).trimEnd() : caption;
+
   return (
     <p className="whitespace-pre-wrap text-sm leading-relaxed">
-      {caption || <span className="text-muted-foreground">(chưa có caption)</span>}
+      {caption ? (
+        <>
+          {shown}
+          {isLong && (
+            <>
+              {!expanded && "… "}
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="font-medium text-muted-foreground hover:underline"
+              >
+                {expanded ? "Thu gọn" : "Xem thêm"}
+              </button>
+            </>
+          )}
+        </>
+      ) : (
+        <span className="text-muted-foreground">(chưa có caption)</span>
+      )}
       {hashtags.length > 0 && (
         <span className="mt-1 block text-sky-600 dark:text-sky-400">
           {hashtags.map((h) => `#${h}`).join(" ")}
@@ -115,7 +142,7 @@ function InstagramFrame(props: PreviewProps) {
 /** TikTok: ảnh full 9:16, caption overlay đáy, action dọc bên phải. */
 function TikTokFrame(props: PreviewProps) {
   return (
-    <div className="relative mx-auto max-w-[260px] overflow-hidden rounded-xl border bg-black">
+    <div className="relative mx-auto max-w-85 overflow-hidden rounded-xl border bg-black">
       <MediaFrame platform="tiktok" imagePath={props.imagePaths[0] ?? null} alt={props.brandName} />
       {/* Overlay thông tin + caption ở đáy. */}
       <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-black/70 to-transparent p-3 pr-12 text-white">

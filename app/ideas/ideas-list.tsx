@@ -6,7 +6,7 @@
  * server action listIdeas() lấy thêm 20 ý tưởng và nối vào danh sách.
  * Reset khi filter đổi nhờ key ở component cha (page.tsx).
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lightbulb } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { listIdeas, type IdeaFilter, type IdeaView } from "@/app/actions/post";
@@ -30,17 +30,34 @@ export function IdeasList({
   hasApiKey: boolean;
   emptyHint: string;
 }) {
-  const [items, setItems] = useState<IdeaView[]>(initialItems);
+  // Chỉ giữ các trang load thêm trong client state; trang đầu lấy thẳng từ
+  // server props (initialItems) nên luôn phản ánh data mới sau revalidate +
+  // router.refresh() (vd sau khi sinh content / cập nhật dàn ý).
+  const [extraItems, setExtraItems] = useState<IdeaView[]>([]);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Server data mới đổ về (initialItems đổi reference) → bỏ các trang đã load
+  // thêm để tránh trùng/lệch, rồi để IntersectionObserver nạp lại nếu cần.
+  useEffect(() => {
+    setExtraItems([]);
+    setHasMore(initialHasMore);
+  }, [initialItems, initialHasMore]);
+
+  // Gộp trang đầu (server) + các trang thêm (client), khử trùng theo id phòng
+  // trường hợp data dịch chuyển giữa các lần phân trang.
+  const items = useMemo(() => {
+    const seen = new Set(initialItems.map((it) => it.id));
+    return [...initialItems, ...extraItems.filter((it) => !seen.has(it.id))];
+  }, [initialItems, extraItems]);
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) return;
     setLoading(true);
     try {
       const page = await listIdeas({ ...filter, limit: PAGE_SIZE, offset: items.length });
-      setItems((prev) => [...prev, ...page.items]);
+      setExtraItems((prev) => [...prev, ...page.items]);
       setHasMore(page.hasMore);
     } finally {
       setLoading(false);
@@ -82,7 +99,6 @@ export function IdeasList({
                 id: it.id,
                 title: it.title,
                 pillar: it.pillar,
-                platform: it.platform,
                 outline: it.outline,
                 outlineVersions: it.outlineVersions,
                 imagePrompt: it.imagePrompt,

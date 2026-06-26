@@ -46,7 +46,7 @@ function PlatformPanel({
   );
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+    <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
       <div className="space-y-6">
         <CaptionEditor
           post={post}

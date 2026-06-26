@@ -2,7 +2,7 @@
 
 /**
  * Idea Generator (Client Component).
- * Chọn pillar + nền tảng → sinh ý tưởng. Ẩn nút generate nếu thiếu API key.
+ * Chọn pillar → sinh ý tưởng (chung cho mọi nền tảng). Ẩn nút generate nếu thiếu API key.
  */
 import { useActionState } from "react";
 import { Sparkles } from "lucide-react";
@@ -12,8 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { generateIdeas, type GenerateState } from "@/app/actions/generate";
 import {
-  PLATFORMS,
-  PLATFORM_LABELS,
   IDEA_LENGTH_LABELS,
   IDEA_GOAL_LABELS,
   type IdeaLength,
@@ -52,31 +50,19 @@ export function IdeasGenerator({
         <h2 className="font-heading text-sm font-semibold">Sinh ý tưởng bằng AI</h2>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="pillar">Content pillar</Label>
-          {pillars.length ? (
-            <select id="pillar" name="pillar" className={selectClass} defaultValue={pillars[0]}>
-              {pillars.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <Input id="pillar" name="pillar" placeholder="VD: Mẹo sử dụng sản phẩm" />
-          )}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="platform">Nền tảng</Label>
-          <select id="platform" name="platform" className={selectClass} defaultValue="facebook">
-            {PLATFORMS.map((p) => (
+      <div className="space-y-2">
+        <Label htmlFor="pillar">Content pillar</Label>
+        {pillars.length ? (
+          <select id="pillar" name="pillar" className={selectClass} defaultValue={pillars[0]}>
+            {pillars.map((p) => (
               <option key={p} value={p}>
-                {PLATFORM_LABELS[p]}
+                {p}
               </option>
             ))}
           </select>
-        </div>
+        ) : (
+          <Input id="pillar" name="pillar" placeholder="VD: Mẹo sử dụng sản phẩm" />
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

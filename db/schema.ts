@@ -46,7 +46,6 @@ export const idea = sqliteTable("idea", {
   // Prompt (tiếng Anh) để tạo ảnh bằng Gemini/Nano Banana; null nếu chưa tạo.
   imagePrompt: text("image_prompt"),
   pillar: text("pillar"),
-  platform: text("platform"), // 'facebook' | 'instagram' | 'tiktok'
   // Tag thủ công gán cho ý tưởng (chọn từ brand.tags) để phân loại/lọc.
   tags: text("tags").notNull().default("[]"), // JSON text: string[]
   status: text("status").notNull().default("draft"),

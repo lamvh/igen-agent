@@ -89,11 +89,13 @@ export type IdeaOptions = {
   tone?: string;
 };
 
-/** Prompt sinh danh sách ý tưởng (title) theo pillar + nền tảng + tùy chọn. */
+/**
+ * Prompt sinh danh sách ý tưởng (title) theo pillar + tùy chọn.
+ * Ý tưởng là CHUNG cho mọi nền tảng — chỉ cá biệt hóa khi sinh caption.
+ */
 export function ideaPrompt(
   brand: BrandView,
   pillar: string,
-  platform: Platform,
   opts: IdeaOptions,
 ): string {
   // Dòng ghi đè chỉ thêm vào prompt khi người dùng nhập (nếu trống đã có trong brandContext).
@@ -109,7 +111,7 @@ export function ideaPrompt(
 Ngữ cảnh thương hiệu:
 ${brandContext(brand)}
 ${overrides ? `\n${overrides}\n` : ""}
-Hãy sinh ${opts.count} ý tưởng nội dung (chỉ tiêu đề/title) cho content pillar "${pillar}" trên ${PLATFORM_LABELS[platform]}.
+Hãy sinh ${opts.count} ý tưởng nội dung (chỉ tiêu đề/title) cho content pillar "${pillar}". Ý tưởng dùng chung cho nhiều nền tảng (Facebook, Instagram, TikTok).
 
 Yêu cầu:
 - ${IDEA_LENGTH_RULES[opts.length]}
@@ -142,21 +144,23 @@ Write ONE detailed image-generation prompt IN ENGLISH for this social media post
 - Be a single ready-to-paste paragraph. Do NOT include any Vietnamese, explanations, or markdown.`;
 }
 
-/** Prompt triển khai 1 tiêu đề ý tưởng thành dàn ý chi tiết (hook + ý chính + CTA). */
-export function outlinePrompt(brand: BrandView, ideaTitle: string, platform: Platform): string {
+/**
+ * Prompt triển khai 1 tiêu đề ý tưởng thành dàn ý chi tiết (hook + ý chính + CTA).
+ * Dàn ý CHUNG cho mọi nền tảng — không bám riêng nền tảng nào.
+ */
+export function outlinePrompt(brand: BrandView, ideaTitle: string): string {
   return `Bạn là chuyên gia lên dàn ý nội dung mạng xã hội tiếng Việt.
 
 Ngữ cảnh thương hiệu:
 ${brandContext(brand)}
 
 Tiêu đề ý tưởng: "${ideaTitle}"
-Nền tảng: ${PLATFORM_LABELS[platform]}
 
-Hãy triển khai tiêu đề trên thành một dàn ý chi tiết cho bài đăng:
+Hãy triển khai tiêu đề trên thành một dàn ý chi tiết cho bài đăng (dùng chung cho nhiều nền tảng):
 - hook: một câu mở đầu thu hút mạnh.
 - points: 3–5 ý chính cần truyền tải (mỗi ý một câu ngắn gọn).
 - cta: một lời kêu gọi hành động phù hợp.
-Tất cả bằng tiếng Việt, bám sát thương hiệu và nền tảng.`;
+Tất cả bằng tiếng Việt, bám sát thương hiệu.`;
 }
 
 /**
@@ -166,7 +170,6 @@ Tất cả bằng tiếng Việt, bám sát thương hiệu và nền tảng.`;
 export function refineOutlinePrompt(
   brand: BrandView,
   ideaTitle: string,
-  platform: Platform,
   currentOutline: string,
   instruction: string,
 ): string {
@@ -176,7 +179,6 @@ Ngữ cảnh thương hiệu:
 ${brandContext(brand)}
 
 Tiêu đề ý tưởng: "${ideaTitle}"
-Nền tảng: ${PLATFORM_LABELS[platform]}
 
 Dàn ý hiện tại:
 """

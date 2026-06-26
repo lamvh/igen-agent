@@ -96,7 +96,6 @@ export async function generateIdeas(_prev: GenerateState, formData: FormData): P
 
   const pillar = String(formData.get("pillar") ?? "").trim();
   // Server action là endpoint công khai → validate mọi input thay vì tin form.
-  const platform = toPlatform(formData.get("platform"));
   if (!pillar) return { success: false, message: "Vui lòng chọn/nhập content pillar." };
 
   const opts = {
@@ -117,7 +116,7 @@ export async function generateIdeas(_prev: GenerateState, formData: FormData): P
         effort: "medium",
         format: zodOutputFormat(ideaListSchema),
       },
-      messages: [{ role: "user", content: ideaPrompt(brand, pillar, platform, opts) }],
+      messages: [{ role: "user", content: ideaPrompt(brand, pillar, opts) }],
     });
 
     await logUsage("ideas", result.usage);
@@ -127,10 +126,11 @@ export async function generateIdeas(_prev: GenerateState, formData: FormData): P
     }
 
     await db.insert(idea).values(
-      ideas.map((title) => ({ brandId: brand.id, title, pillar, platform, status: "draft" })),
+      ideas.map((title) => ({ brandId: brand.id, title, pillar, status: "draft" })),
     );
     savedCount = ideas.length;
-  } catch {
+  } catch (err) {
+    console.error("generateIdeas failed:", err);
     return { success: false, message: "Sinh ý tưởng thất bại, vui lòng thử lại." };
   }
 
@@ -152,7 +152,8 @@ async function buildImagePrompt(content: string, platform: Platform): Promise<st
     });
     await logUsage("caption", result.usage);
     return result.parsed_output?.prompt?.trim() || null;
-  } catch {
+  } catch (err) {
+    console.error("buildImagePrompt failed:", err);
     return null;
   }
 }
@@ -170,7 +171,8 @@ export async function generateImagePromptForIdea(ideaId: number): Promise<Genera
   if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
 
   const content = current.outline ? `${current.title}\n\n${current.outline}` : current.title;
-  const prompt = await buildImagePrompt(content, toPlatform(current.platform));
+  // Ý tưởng không gắn nền tảng → dùng facebook làm tỉ lệ/aesthetic mặc định cho prompt ảnh.
+  const prompt = await buildImagePrompt(content, "facebook");
   if (!prompt) return { success: false, message: "Tạo prompt ảnh thất bại, vui lòng thử lại." };
 
   await db.update(idea).set({ imagePrompt: prompt }).where(eq(idea.id, ideaId));
@@ -210,23 +212,21 @@ export async function generateOutline(ideaId: number): Promise<GenerateState> {
   const current = rows[0];
   if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
 
-  // Mặc định facebook nếu ý tưởng chưa gắn nền tảng (cột nullable).
-  const platform = toPlatform(current.platform);
-
   let outlineText = "";
   try {
     const client = getClaudeClient();
     const result = await client.messages.parse({
       model: CLAUDE_MODEL,
-      max_tokens: 1024,
+      max_tokens: 4096,
       output_config: { effort: "low", format: zodOutputFormat(ideaOutlineSchema) },
-      messages: [{ role: "user", content: outlinePrompt(brand, current.title, platform) }],
+      messages: [{ role: "user", content: outlinePrompt(brand, current.title) }],
     });
     await logUsage("outline", result.usage);
     const parsed = result.parsed_output;
     if (!parsed) return { success: false, message: "Không tạo được dàn ý, vui lòng thử lại." };
     outlineText = formatOutline(parsed);
-  } catch {
+  } catch (err) {
+    console.error("generateOutline failed:", err);
     return { success: false, message: "Tạo dàn ý thất bại, vui lòng thử lại." };
   }
 
@@ -261,19 +261,17 @@ export async function refineOutline(ideaId: number, instruction: string): Promis
     return { success: false, message: "Chưa có dàn ý để chỉnh — hãy tạo dàn ý trước." };
   }
 
-  const platform = toPlatform(current.platform);
-
   let outlineText = "";
   try {
     const client = getClaudeClient();
     const result = await client.messages.parse({
       model: CLAUDE_MODEL,
-      max_tokens: 1024,
+      max_tokens: 4096,
       output_config: { effort: "low", format: zodOutputFormat(ideaOutlineSchema) },
       messages: [
         {
           role: "user",
-          content: refineOutlinePrompt(brand, current.title, platform, current.outline, note),
+          content: refineOutlinePrompt(brand, current.title, current.outline, note),
         },
       ],
     });
@@ -281,7 +279,8 @@ export async function refineOutline(ideaId: number, instruction: string): Promis
     const parsed = result.parsed_output;
     if (!parsed) return { success: false, message: "Không cập nhật được dàn ý, vui lòng thử lại." };
     outlineText = formatOutline(parsed);
-  } catch {
+  } catch (err) {
+    console.error("refineOutline failed:", err);
     return { success: false, message: "Cập nhật dàn ý thất bại, vui lòng thử lại." };
   }
 
@@ -322,7 +321,8 @@ async function buildCaptionValue(
     if (!caption) return null;
     const hashtags = (result.parsed_output?.hashtags ?? []).map((h) => h.trim()).filter(Boolean);
     return { caption, hashtags };
-  } catch {
+  } catch (err) {
+    console.error("generateCaptionContent failed:", err);
     return null;
   }
 }
@@ -407,7 +407,8 @@ export async function generateCaptionForPlatform(
       hashtags: serializeJsonArray(built.hashtags),
       status: "draft",
     });
-  } catch {
+  } catch (err) {
+    console.error("generateCaptionForPlatform insert failed:", err);
     return { success: false, message: "Không tạo được caption, vui lòng thử lại." };
   }
 
@@ -459,7 +460,8 @@ export async function regenerateCaption(postId: number): Promise<GenerateState> 
       .update(post)
       .set({ caption, hashtags: serializeJsonArray(hashtags) })
       .where(eq(post.id, postId));
-  } catch {
+  } catch (err) {
+    console.error("regenerateCaption failed:", err);
     return { success: false, message: "Viết lại caption thất bại, vui lòng thử lại." };
   }
 

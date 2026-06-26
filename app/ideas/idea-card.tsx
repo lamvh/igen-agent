@@ -28,6 +28,7 @@ import {
 } from "@/app/actions/post";
 import {
   OUTLINE_SOURCE_LABELS,
+  activeVersionId,
   type OutlineVersion,
 } from "@/lib/outline-versions";
 
@@ -98,9 +99,10 @@ function OutlineEditor({
 
   const dirty = text !== (outline ?? "");
 
-  // Lịch sử hiển thị mới nhất trước; bản trùng nội dung active được đánh dấu.
+  // Lịch sử hiển thị mới nhất trước; bản đang dùng = bản cuối mảng (theo id),
+  // nên dù có bản trùng nội dung cũng chỉ đúng 1 bản được đánh dấu.
   const history = [...versions].reverse();
-  const activeContent = (outline ?? "").trim();
+  const activeId = activeVersionId(versions);
 
   function onRestore(versionId: string) {
     setError("");
@@ -192,7 +194,7 @@ function OutlineEditor({
           </summary>
           <ul className="max-h-60 space-y-1 overflow-y-auto px-2.5 pb-2.5">
             {history.map((v) => {
-              const isActive = v.content.trim() === activeContent;
+              const isActive = v.id === activeId;
               const preview = v.content.replace(/\s+/g, " ").trim().slice(0, 80);
               return (
                 <li
@@ -246,7 +248,6 @@ export type IdeaCardData = {
   id: number;
   title: string;
   pillar: string | null;
-  platform: string | null;
   outline: string | null;
   outlineVersions: OutlineVersion[];
   imagePrompt: string | null;
@@ -296,13 +297,6 @@ export function IdeaCard({
             <span className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-violet-100 to-indigo-100 text-primary dark:from-violet-950/60 dark:to-indigo-950/60">
               <Sparkles className="size-4" />
             </span>
-            {idea.platform && (
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${PLATFORM_BADGE[idea.platform] ?? "bg-muted"}`}
-              >
-                {PLATFORM_LABELS[idea.platform as Platform] ?? idea.platform}
-              </span>
-            )}
           </div>
 
           <p className="text-[15px] font-semibold leading-snug tracking-tight text-foreground">
@@ -375,13 +369,6 @@ export function IdeaCard({
 
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              {idea.platform && (
-                <span
-                  className={`rounded-full px-2 py-0.5 font-medium ${PLATFORM_BADGE[idea.platform] ?? "bg-muted"}`}
-                >
-                  {PLATFORM_LABELS[idea.platform as Platform] ?? idea.platform}
-                </span>
-              )}
               {idea.pillar && (
                 <span className="rounded-md bg-muted px-1.5 py-0.5 text-muted-foreground">
                   {idea.pillar}
