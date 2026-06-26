@@ -26,8 +26,11 @@ export type PostListItem = Omit<Post, "hashtags"> & {
 
 export type SaveCaptionState = { success: boolean; message: string };
 
-/** Ý tưởng kèm tags đã parse (JSON text → string[]) cho client. */
-export type IdeaView = Omit<Idea, "tags"> & { tags: string[] };
+/** Post tóm tắt (id + nền tảng) gắn với 1 ý tưởng — để link từ /ideas vào editor. */
+export type IdeaPostLink = { id: number; platform: string | null };
+
+/** Ý tưởng kèm tags đã parse + các post đã tạo từ nó (cho link tới editor). */
+export type IdeaView = Omit<Idea, "tags"> & { tags: string[]; posts: IdeaPostLink[] };
 
 /** Ý tưởng của brand hiện tại (mới nhất trước). [] nếu chưa có brand. */
 export async function listIdeas(): Promise<IdeaView[]> {
@@ -38,7 +41,29 @@ export async function listIdeas(): Promise<IdeaView[]> {
     .from(idea)
     .where(eq(idea.brandId, brand.id))
     .orderBy(desc(idea.id));
-  return rows.map((r) => ({ ...r, tags: parseJsonArray<string>(r.tags) }));
+
+  // Gom post của các ý tưởng bằng 1 query (tránh N+1), rồi nhóm theo ideaId.
+  const ideaIds = rows.map((r) => r.id);
+  const postRows = ideaIds.length
+    ? await db
+        .select({ id: post.id, platform: post.platform, ideaId: post.ideaId })
+        .from(post)
+        .where(inArray(post.ideaId, ideaIds))
+        .orderBy(asc(post.id))
+    : [];
+  const postsByIdea = new Map<number, IdeaPostLink[]>();
+  for (const p of postRows) {
+    if (p.ideaId == null) continue;
+    const list = postsByIdea.get(p.ideaId) ?? [];
+    list.push({ id: p.id, platform: p.platform });
+    postsByIdea.set(p.ideaId, list);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    tags: parseJsonArray<string>(r.tags),
+    posts: postsByIdea.get(r.id) ?? [],
+  }));
 }
 
 function toView(row: Post, ideaTitle: string | null): PostView {

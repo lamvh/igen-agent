@@ -5,10 +5,54 @@
  * Click cả thẻ để mở panel xem dàn ý + prompt Gemini đầy đủ; các nút action
  * bên trong chặn lan (stopPropagation) để không mở nhầm panel.
  */
-import { useState } from "react";
-import { Sparkles, ListChecks, ImageIcon } from "lucide-react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Sparkles, ListChecks, ImageIcon, FileText, ArrowUpRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { CopyButton } from "@/components/shell/copy-button";
-import { IdeaActions } from "./idea-actions";
+import { IdeaActions, CaptionCreator } from "./idea-actions";
+import {
+  generateOutline,
+  generateImagePromptForIdea,
+  type GenerateState,
+} from "@/app/actions/generate";
+import type { IdeaPostLink } from "@/app/actions/post";
+
+/** Nút sinh dàn ý / prompt trong panel; refresh để hiện nội dung mới. */
+function GenerateButton({
+  action,
+  label,
+  pendingLabel,
+}: {
+  action: () => Promise<GenerateState>;
+  label: string;
+  pendingLabel: string;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState("");
+
+  function onClick() {
+    setError("");
+    start(async () => {
+      const res = await action();
+      if (res.success) router.refresh();
+      else setError(res.message);
+    });
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button type="button" size="sm" variant="outline" onClick={onClick} disabled={pending}>
+        {pending ? <Spinner /> : <Sparkles className="size-4" />}
+        {pending ? pendingLabel : label}
+      </Button>
+      {error && <span className="text-xs text-destructive">{error}</span>}
+    </div>
+  );
+}
 import {
   Dialog,
   DialogContent,
@@ -31,6 +75,7 @@ export type IdeaCardData = {
   outline: string | null;
   imagePrompt: string | null;
   tags: string[];
+  posts: IdeaPostLink[];
 };
 
 export function IdeaCard({
@@ -135,16 +180,9 @@ export function IdeaCard({
 
           <div className="mt-4 flex-1" />
 
-          {/* Action: chặn lan để không mở panel khi bấm. */}
+          {/* Tag + xóa: chặn lan để không mở panel khi bấm. */}
           <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
-            <IdeaActions
-              ideaId={idea.id}
-              outline={idea.outline}
-              imagePrompt={idea.imagePrompt}
-              tags={idea.tags}
-              availableTags={availableTags}
-              hasApiKey={hasApiKey}
-            />
+            <IdeaActions ideaId={idea.id} tags={idea.tags} availableTags={availableTags} />
           </div>
         </div>
       </div>
@@ -183,38 +221,93 @@ export function IdeaCard({
               ))}
             </div>
 
-            {idea.outline ? (
+            {/* Tạo caption: chọn nền tảng + độ dài rồi sinh nội dung. */}
+            {hasApiKey && (
               <section>
                 <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
-                  <ListChecks className="size-4 text-primary" /> Dàn ý
+                  <Sparkles className="size-4 text-primary" /> Tạo nội dung
                 </div>
+                <CaptionCreator ideaId={idea.id} />
+              </section>
+            )}
+
+            {/* Nội dung đã tạo từ ý tưởng — link thẳng vào editor. */}
+            {idea.posts.length > 0 && (
+              <section>
+                <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+                  <FileText className="size-4 text-primary" /> Nội dung đã tạo
+                </div>
+                <div className="space-y-1.5">
+                  {idea.posts.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/editor/${p.id}`}
+                      className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-muted"
+                    >
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${PLATFORM_BADGE[p.platform ?? ""] ?? "bg-muted"}`}
+                      >
+                        {PLATFORM_LABELS[p.platform as Platform] ?? p.platform ?? "Nội dung"}
+                      </span>
+                      <ArrowUpRight className="size-4 text-muted-foreground" />
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Dàn ý — nút tạo nằm ngay tại section này. */}
+            <section>
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  <ListChecks className="size-4 text-primary" /> Dàn ý
+                </span>
+                {hasApiKey && (
+                  <GenerateButton
+                    action={() => generateOutline(idea.id)}
+                    label={idea.outline ? "Tạo lại" : "Tạo dàn ý"}
+                    pendingLabel="Đang tạo…"
+                  />
+                )}
+              </div>
+              {idea.outline ? (
                 <pre className="whitespace-pre-wrap rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground">
                   {idea.outline}
                 </pre>
-              </section>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Chưa có dàn ý. Bấm “Dàn ý” trên thẻ để tạo.
-              </p>
-            )}
+              ) : (
+                <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                  Chưa có dàn ý. Bấm “Tạo dàn ý” để triển khai ý tưởng thành hook + ý chính + CTA.
+                </p>
+              )}
+            </section>
 
-            {idea.imagePrompt ? (
-              <section>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-sm font-medium">
-                    <ImageIcon className="size-4 text-primary" /> Prompt ảnh (Gemini)
-                  </span>
-                  <CopyButton text={idea.imagePrompt} />
+            {/* Prompt ảnh — nút tạo nằm ngay tại section này. */}
+            <section>
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  <ImageIcon className="size-4 text-primary" /> Prompt ảnh (Gemini)
+                </span>
+                <div className="flex items-center gap-2">
+                  {idea.imagePrompt && <CopyButton text={idea.imagePrompt} />}
+                  {hasApiKey && (
+                    <GenerateButton
+                      action={() => generateImagePromptForIdea(idea.id)}
+                      label={idea.imagePrompt ? "Tạo lại" : "Tạo prompt"}
+                      pendingLabel="Đang tạo…"
+                    />
+                  )}
                 </div>
+              </div>
+              {idea.imagePrompt ? (
                 <p className="whitespace-pre-wrap rounded-lg border border-primary/20 bg-accent/40 p-3 text-xs text-muted-foreground">
                   {idea.imagePrompt}
                 </p>
-              </section>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Chưa có prompt ảnh. Bấm “Prompt ảnh” trên thẻ để tạo.
-              </p>
-            )}
+              ) : (
+                <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                  Chưa có prompt ảnh. Bấm “Tạo prompt” để sinh prompt tiếng Anh cho Gemini.
+                </p>
+              )}
+            </section>
           </div>
         </DialogContent>
       </Dialog>

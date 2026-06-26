@@ -121,6 +121,7 @@ export default async function IdeasPage({
                       outline: it.outline,
                       imagePrompt: it.imagePrompt,
                       tags: it.tags,
+                      posts: it.posts,
                     }}
                     availableTags={availableTags}
                     hasApiKey={keyAvailable}
