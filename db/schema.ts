@@ -39,7 +39,10 @@ export const idea = sqliteTable("idea", {
     .references(() => brand.id),
   title: text("title").notNull(),
   // Dàn ý chi tiết triển khai từ title (bước 2 của quy trình); null nếu chưa tạo.
+  // Đây là bản "active" — dùng để tinh chỉnh tiếp & sinh caption.
   outline: text("outline"),
+  // Lịch sử các phiên bản dàn ý (JSON text: OutlineVersion[]) để chọn lại bản cũ.
+  outlineVersions: text("outline_versions").notNull().default("[]"),
   // Prompt (tiếng Anh) để tạo ảnh bằng Gemini/Nano Banana; null nếu chưa tạo.
   imagePrompt: text("image_prompt"),
   pillar: text("pillar"),

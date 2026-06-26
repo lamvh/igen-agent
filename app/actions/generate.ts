@@ -35,6 +35,7 @@ import {
   formatOutline,
 } from "@/lib/validations/generate";
 import { serializeJsonArray } from "@/lib/json";
+import { appendOutlineVersion } from "@/lib/outline-versions";
 import { logUsage } from "@/lib/ai/usage";
 
 // Ràng buộc số lượng ý tưởng — chặn giá trị bất thường từ form.
@@ -229,7 +230,13 @@ export async function generateOutline(ideaId: number): Promise<GenerateState> {
     return { success: false, message: "Tạo dàn ý thất bại, vui lòng thử lại." };
   }
 
-  await db.update(idea).set({ outline: outlineText }).where(eq(idea.id, ideaId));
+  await db
+    .update(idea)
+    .set({
+      outline: outlineText,
+      outlineVersions: appendOutlineVersion(current.outlineVersions, outlineText, "generate"),
+    })
+    .where(eq(idea.id, ideaId));
   revalidatePath("/ideas");
   return { success: true, message: "Đã tạo dàn ý." };
 }
@@ -278,7 +285,13 @@ export async function refineOutline(ideaId: number, instruction: string): Promis
     return { success: false, message: "Cập nhật dàn ý thất bại, vui lòng thử lại." };
   }
 
-  await db.update(idea).set({ outline: outlineText }).where(eq(idea.id, ideaId));
+  await db
+    .update(idea)
+    .set({
+      outline: outlineText,
+      outlineVersions: appendOutlineVersion(current.outlineVersions, outlineText, "refine"),
+    })
+    .where(eq(idea.id, ideaId));
   revalidatePath("/ideas");
   return { success: true, message: "Đã cập nhật dàn ý." };
 }

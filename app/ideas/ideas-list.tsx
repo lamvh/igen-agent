@@ -84,6 +84,7 @@ export function IdeasList({
                 pillar: it.pillar,
                 platform: it.platform,
                 outline: it.outline,
+                outlineVersions: it.outlineVersions,
                 imagePrompt: it.imagePrompt,
                 tags: it.tags,
                 posts: it.posts,

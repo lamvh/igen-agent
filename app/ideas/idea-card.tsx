@@ -21,7 +21,15 @@ import {
   refineOutline,
   type GenerateState,
 } from "@/app/actions/generate";
-import { saveIdeaOutline, type IdeaPostLink } from "@/app/actions/post";
+import {
+  saveIdeaOutline,
+  restoreOutlineVersion,
+  type IdeaPostLink,
+} from "@/app/actions/post";
+import {
+  OUTLINE_SOURCE_LABELS,
+  type OutlineVersion,
+} from "@/lib/outline-versions";
 
 /** Nút sinh dàn ý / prompt trong panel; refresh để hiện nội dung mới. */
 function GenerateButton({
@@ -71,10 +79,12 @@ import { PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
 function OutlineEditor({
   ideaId,
   outline,
+  versions,
   hasApiKey,
 }: {
   ideaId: number;
   outline: string | null;
+  versions: OutlineVersion[];
   hasApiKey: boolean;
 }) {
   const router = useRouter();
@@ -82,10 +92,25 @@ function OutlineEditor({
   const [instruction, setInstruction] = useState("");
   const [saving, startSave] = useTransition();
   const [refining, startRefine] = useTransition();
+  const [restoring, startRestore] = useTransition();
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
 
   const dirty = text !== (outline ?? "");
+
+  // Lịch sử hiển thị mới nhất trước; bản trùng nội dung active được đánh dấu.
+  const history = [...versions].reverse();
+  const activeContent = (outline ?? "").trim();
+
+  function onRestore(versionId: string) {
+    setError("");
+    setMsg("");
+    startRestore(async () => {
+      const res = await restoreOutlineVersion(ideaId, versionId);
+      if (res.success) router.refresh();
+      else setError(res.message);
+    });
+  }
 
   function onSave() {
     setError("");
@@ -159,6 +184,53 @@ function OutlineEditor({
         </div>
       )}
 
+      {/* Lịch sử phiên bản — chọn bản cũ để khôi phục làm bản đang dùng. */}
+      {history.length > 0 && (
+        <details className="rounded-lg border border-dashed">
+          <summary className="cursor-pointer select-none px-2.5 py-2 text-xs font-medium text-muted-foreground">
+            Lịch sử dàn ý ({history.length})
+          </summary>
+          <ul className="max-h-60 space-y-1 overflow-y-auto px-2.5 pb-2.5">
+            {history.map((v) => {
+              const isActive = v.content.trim() === activeContent;
+              const preview = v.content.replace(/\s+/g, " ").trim().slice(0, 80);
+              return (
+                <li
+                  key={v.id}
+                  className={`rounded-md border p-2 ${
+                    isActive ? "border-primary/50 bg-accent/40" : "border-input"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-muted-foreground">
+                      {OUTLINE_SOURCE_LABELS[v.source]} ·{" "}
+                      {new Date(v.createdAt).toLocaleString("vi-VN")}
+                    </span>
+                    {isActive ? (
+                      <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+                        Đang dùng
+                      </span>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-[11px]"
+                        onClick={() => onRestore(v.id)}
+                        disabled={restoring}
+                      >
+                        {restoring ? <Spinner /> : "Dùng bản này"}
+                      </Button>
+                    )}
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{preview}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
@@ -176,6 +248,7 @@ export type IdeaCardData = {
   pillar: string | null;
   platform: string | null;
   outline: string | null;
+  outlineVersions: OutlineVersion[];
   imagePrompt: string | null;
   tags: string[];
   posts: IdeaPostLink[];
@@ -294,7 +367,7 @@ export function IdeaCard({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton
-          className="top-0 right-0 left-auto flex h-svh max-h-svh w-full max-w-md translate-x-0 translate-y-0 flex-col items-stretch gap-0 space-y-4 overflow-y-auto rounded-none rounded-l-2xl p-5 sm:max-w-md data-open:slide-in-from-right data-closed:slide-out-to-right"
+          className="top-0 right-0 left-auto flex h-svh max-h-svh w-full max-w-2xl translate-x-0 translate-y-0 flex-col items-stretch gap-0 space-y-4 overflow-y-auto rounded-none rounded-l-2xl p-5 sm:max-w-2xl data-open:slide-in-from-right data-closed:slide-out-to-right"
         >
           <DialogHeader>
             <DialogTitle className="pr-8">{idea.title}</DialogTitle>
@@ -377,6 +450,7 @@ export function IdeaCard({
                 key={idea.outline ?? "empty"}
                 ideaId={idea.id}
                 outline={idea.outline}
+                versions={idea.outlineVersions}
                 hasApiKey={hasApiKey}
               />
             </section>

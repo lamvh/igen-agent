@@ -1,0 +1,1 @@
+ALTER TABLE `idea` ADD `outline_versions` text DEFAULT '[]' NOT NULL;

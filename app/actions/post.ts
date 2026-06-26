@@ -14,6 +14,11 @@ import { getBrand } from "@/app/actions/brand";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
 import type { PostStatus } from "@/lib/post-status";
 import type { Platform } from "@/lib/ai/prompts";
+import {
+  appendOutlineVersion,
+  parseOutlineVersions,
+  type OutlineVersion,
+} from "@/lib/outline-versions";
 
 export type PostView = Omit<Post, "hashtags"> & { hashtags: string[]; ideaTitle: string | null };
 
@@ -29,8 +34,12 @@ export type SaveCaptionState = { success: boolean; message: string };
 /** Post tóm tắt (id + nền tảng) gắn với 1 ý tưởng — để link từ /ideas vào editor. */
 export type IdeaPostLink = { id: number; platform: string | null };
 
-/** Ý tưởng kèm tags đã parse + các post đã tạo từ nó (cho link tới editor). */
-export type IdeaView = Omit<Idea, "tags"> & { tags: string[]; posts: IdeaPostLink[] };
+/** Ý tưởng kèm tags + lịch sử dàn ý đã parse + các post đã tạo từ nó. */
+export type IdeaView = Omit<Idea, "tags" | "outlineVersions"> & {
+  tags: string[];
+  outlineVersions: OutlineVersion[];
+  posts: IdeaPostLink[];
+};
 
 /** Bộ lọc + phân trang cho danh sách ý tưởng (dùng cho cả SSR lẫn infinite scroll). */
 export type IdeaFilter = {
@@ -106,6 +115,7 @@ export async function listIdeas(filter: IdeaFilter = {}): Promise<IdeaPage> {
   const items = pageRows.map((r) => ({
     ...r,
     tags: parseJsonArray<string>(r.tags),
+    outlineVersions: parseOutlineVersions(r.outlineVersions),
     posts: postsByIdea.get(r.id) ?? [],
   }));
   return { items, hasMore };
@@ -247,12 +257,62 @@ export async function saveIdeaOutline(ideaId: number, outline: string): Promise<
   }
   const value = outline.trim() || null;
   try {
-    await db.update(idea).set({ outline: value }).where(eq(idea.id, ideaId));
+    const rows = await db
+      .select({ outlineVersions: idea.outlineVersions })
+      .from(idea)
+      .where(eq(idea.id, ideaId))
+      .limit(1);
+    if (!rows[0]) return { success: false, message: "Không tìm thấy ý tưởng." };
+
+    // Chỉ snapshot khi có nội dung; xoá trắng outline thì giữ nguyên lịch sử.
+    const outlineVersions = value
+      ? appendOutlineVersion(rows[0].outlineVersions, value, "manual")
+      : rows[0].outlineVersions;
+
+    await db.update(idea).set({ outline: value, outlineVersions }).where(eq(idea.id, ideaId));
   } catch {
     return { success: false, message: "Lưu dàn ý thất bại." };
   }
   revalidatePath("/ideas");
   return { success: true, message: "Đã lưu dàn ý." };
+}
+
+/**
+ * Khôi phục 1 phiên bản dàn ý cũ làm bản active (idea.outline).
+ * Vẫn append một bản "manual" vào lịch sử để không mất mạch — sau đó có thể
+ * tinh chỉnh tiếp hoặc dùng để sinh caption.
+ */
+export async function restoreOutlineVersion(
+  ideaId: number,
+  versionId: string,
+): Promise<DeleteState> {
+  if (!Number.isInteger(ideaId) || ideaId <= 0) {
+    return { success: false, message: "Ý tưởng không hợp lệ." };
+  }
+  const rows = await db
+    .select({ outlineVersions: idea.outlineVersions })
+    .from(idea)
+    .where(eq(idea.id, ideaId))
+    .limit(1);
+  if (!rows[0]) return { success: false, message: "Không tìm thấy ý tưởng." };
+
+  const versions = parseOutlineVersions(rows[0].outlineVersions);
+  const target = versions.find((v) => v.id === versionId);
+  if (!target) return { success: false, message: "Không tìm thấy phiên bản dàn ý." };
+
+  try {
+    await db
+      .update(idea)
+      .set({
+        outline: target.content,
+        outlineVersions: appendOutlineVersion(rows[0].outlineVersions, target.content, "manual"),
+      })
+      .where(eq(idea.id, ideaId));
+  } catch {
+    return { success: false, message: "Khôi phục dàn ý thất bại." };
+  }
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã khôi phục phiên bản dàn ý." };
 }
 
 /**
