@@ -8,11 +8,10 @@
  * Ẩn toàn bộ khi thiếu API key.
  */
 import { useActionState, useState, useTransition } from "react";
-import { Image as ImageIcon, Tag, Check } from "lucide-react";
+import { Image as ImageIcon, Tag, Check, Sparkles, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { DeleteButton } from "@/components/shell/delete-button";
-import { CopyButton } from "@/components/shell/copy-button";
 import {
   generateOutline,
   generateCaption,
@@ -77,16 +76,22 @@ export function IdeaActions({
     initialState,
   );
 
-  // Tạo caption theo nền tảng + độ dài chọn (mặc định FB, vừa). Redirect khi thành công.
-  const [captionPlatform, setCaptionPlatform] = useState<Platform>("facebook");
-  const [captionLength, setCaptionLength] = useState<CaptionLength>("medium");
+  // Người dùng phải tự chọn nền tảng + độ dài (placeholder rỗng, không mặc định).
+  const [captionPlatform, setCaptionPlatform] = useState<Platform | "">("");
+  const [captionLength, setCaptionLength] = useState<CaptionLength | "">("");
   const [captionPending, startCaption] = useTransition();
   const [captionError, setCaptionError] = useState("");
 
+  const canCreateCaption = captionPlatform !== "" && captionLength !== "";
+
   function onCreateCaption() {
+    if (!canCreateCaption) {
+      setCaptionError("Vui lòng chọn nền tảng và độ dài.");
+      return;
+    }
     setCaptionError("");
     startCaption(async () => {
-      const res = await generateCaption(ideaId, captionPlatform, captionLength);
+      const res = await generateCaption(ideaId, captionPlatform as Platform, captionLength as CaptionLength);
       // Thành công sẽ redirect; chỉ tới đây khi lỗi.
       if (!res.success) setCaptionError(res.message);
     });
@@ -99,25 +104,24 @@ export function IdeaActions({
     "";
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {/* Nút sinh AI chỉ hiện khi có API key; xóa luôn cho phép. */}
-        {hasApiKey && (
-          <>
-            <form action={outlineAction}>
-              <Button type="submit" size="sm" variant="ghost" disabled={outlinePending}>
-                {outlinePending && <Spinner />}
-                {outlinePending ? "Đang phác…" : outline ? "Tạo lại dàn ý" : "Tạo dàn ý"}
-              </Button>
-            </form>
-            <div className="flex items-center gap-1.5">
+    <div className="space-y-3">
+      {hasApiKey && (
+        <>
+          {/* Hành động chính: chọn nền tảng + độ dài rồi Tạo caption. */}
+          <div className="space-y-2 rounded-xl bg-muted/40 p-2.5">
+            <div className="grid grid-cols-2 gap-2">
               <select
                 aria-label="Nền tảng"
                 value={captionPlatform}
                 onChange={(e) => setCaptionPlatform(e.target.value as Platform)}
                 disabled={captionPending}
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-xs"
+                className={`h-8 rounded-lg border border-input bg-background px-2 text-xs ${
+                  captionPlatform === "" ? "text-muted-foreground" : ""
+                }`}
               >
+                <option value="" disabled>
+                  Chọn nền tảng…
+                </option>
                 {PLATFORMS.map((p) => (
                   <option key={p} value={p}>
                     {PLATFORM_LABELS[p]}
@@ -129,39 +133,72 @@ export function IdeaActions({
                 value={captionLength}
                 onChange={(e) => setCaptionLength(e.target.value as CaptionLength)}
                 disabled={captionPending}
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-xs"
+                className={`h-8 rounded-lg border border-input bg-background px-2 text-xs ${
+                  captionLength === "" ? "text-muted-foreground" : ""
+                }`}
               >
+                <option value="" disabled>
+                  Chọn độ dài…
+                </option>
                 {(Object.keys(CAPTION_LENGTH_LABELS) as CaptionLength[]).map((k) => (
                   <option key={k} value={k}>
                     {CAPTION_LENGTH_LABELS[k]}
                   </option>
                 ))}
               </select>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={onCreateCaption}
-                disabled={captionPending}
-              >
-                {captionPending && <Spinner />}
-                {captionPending ? "Đang tạo…" : "Tạo caption"}
-              </Button>
             </div>
-            <form action={imgAction}>
-              <Button type="submit" size="sm" variant="ghost" disabled={imgPending}>
-                {imgPending ? <Spinner /> : <ImageIcon className="size-4" />}
-                {imgPending ? "Đang tạo…" : imagePrompt ? "Tạo lại prompt ảnh" : "Tạo prompt ảnh"}
+            <Button
+              type="button"
+              size="sm"
+              onClick={onCreateCaption}
+              disabled={captionPending || !canCreateCaption}
+              className="w-full"
+            >
+              {captionPending ? <Spinner /> : <Sparkles className="size-4" />}
+              {captionPending ? "Đang tạo caption…" : "Tạo caption"}
+            </Button>
+          </div>
+
+          {/* Hành động phụ: icon nhỏ, nhẹ. */}
+          <div className="flex items-center gap-1">
+            <form action={outlineAction} className="flex-1">
+              <Button
+                type="submit"
+                size="sm"
+                variant="ghost"
+                disabled={outlinePending}
+                className="w-full text-xs text-muted-foreground"
+                title={outline ? "Tạo lại dàn ý" : "Tạo dàn ý"}
+              >
+                {outlinePending ? <Spinner /> : <ListChecks className="size-4" />}
+                {outline ? "Dàn ý ✓" : "Dàn ý"}
               </Button>
             </form>
-          </>
-        )}
-        {availableTags.length > 0 && (
+            <form action={imgAction} className="flex-1">
+              <Button
+                type="submit"
+                size="sm"
+                variant="ghost"
+                disabled={imgPending}
+                className="w-full text-xs text-muted-foreground"
+                title={imagePrompt ? "Tạo lại prompt ảnh" : "Tạo prompt ảnh"}
+              >
+                {imgPending ? <Spinner /> : <ImageIcon className="size-4" />}
+                {imagePrompt ? "Prompt ✓" : "Prompt ảnh"}
+              </Button>
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* Tag + Xóa: tách riêng, nhẹ. */}
+      <div className="flex items-center justify-between">
+        {availableTags.length > 0 ? (
           <Dialog>
             <DialogTrigger asChild>
-              <Button type="button" size="sm" variant="ghost">
-                <Tag className="size-4" />
-                Tag
+              <Button type="button" size="sm" variant="ghost" className="text-xs text-muted-foreground">
+                <Tag className="size-3.5" />
+                {tagState.length > 0 ? `${tagState.length} tag` : "Gắn tag"}
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -192,6 +229,8 @@ export function IdeaActions({
               </div>
             </DialogContent>
           </Dialog>
+        ) : (
+          <span />
         )}
         <DeleteButton
           action={() => deleteIdea(ideaId)}
@@ -200,37 +239,10 @@ export function IdeaActions({
         />
       </div>
 
-      {tagState.length > 0 && (
-        <div className="flex flex-wrap justify-end gap-1.5">
-          {tagState.map((tag) => (
-            <span
-              key={tag}
-              className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-primary"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {outline && (
-        <pre className="mt-1 max-w-md whitespace-pre-wrap rounded-lg bg-muted/60 p-3 text-left text-xs text-muted-foreground">
-          {outline}
-        </pre>
-      )}
-
-      {imagePrompt && (
-        <div className="mt-1 max-w-md rounded-lg border border-primary/20 bg-accent/40 p-3 text-left">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-primary">Prompt ảnh (Gemini)</span>
-            <CopyButton text={imagePrompt} />
-          </div>
-          <p className="whitespace-pre-wrap text-xs text-muted-foreground">{imagePrompt}</p>
-        </div>
-      )}
+      {/* Dàn ý + prompt ảnh hiển thị trong panel chi tiết (IdeaCard), không inline. */}
 
       {error && (
-        <p className="text-right text-xs text-destructive" aria-live="polite">
+        <p className="text-xs text-destructive" aria-live="polite">
           {error}
         </p>
       )}
