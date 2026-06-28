@@ -57,6 +57,13 @@
       "when": 1782446163059,
       "tag": "0007_sharp_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782459387554,
+      "tag": "0008_cooing_hiroim",
+      "breakpoints": true
     }
   ]
 }

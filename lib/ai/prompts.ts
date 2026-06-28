@@ -125,11 +125,16 @@ Yêu cầu:
  * `content` là tiêu đề/dàn ý (cho ý tưởng) hoặc caption (cho post).
  */
 export function imagePromptPrompt(brand: BrandView, content: string, platform: Platform): string {
+  // Nguyên tắc riêng cho ảnh do người dùng nhập (tab Thương hiệu) — chèn nếu có.
+  const imageRules = brand.imagePromptRules?.trim()
+    ? `\nImage rules to obey (from the brand owner):\n${brand.imagePromptRules.trim()}\n`
+    : "";
+
   return `You are an expert prompt engineer for AI image generation (Gemini / Nano Banana).
 
 Brand context:
 ${brandContext(brand)}
-
+${imageRules}
 Content to illustrate (in Vietnamese):
 """
 ${content}
@@ -141,7 +146,7 @@ Write ONE detailed image-generation prompt IN ENGLISH for this social media post
 - Describe the main subject, composition, background, lighting, color mood, and visual style.
 - Fit the brand identity and the platform's typical aesthetic.
 - Suggest an aspect ratio suited to ${PLATFORM_LABELS[platform]} (e.g. 1:1, 4:5, or 9:16).
-- Be a single ready-to-paste paragraph. Do NOT include any Vietnamese, explanations, or markdown.`;
+- Be a single ready-to-paste paragraph. Do NOT include any Vietnamese, explanations, or markdown.${imageRules ? "\n- Strictly follow the image rules listed above." : ""}`;
 }
 
 /**

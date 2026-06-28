@@ -1,0 +1,1 @@
+ALTER TABLE `brand` ADD `image_prompt_rules` text DEFAULT '' NOT NULL;

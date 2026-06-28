@@ -8,12 +8,14 @@ import { getBrand } from "@/app/actions/brand";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { ClaudeTestButton } from "./claude-test-button";
 import { BrandForm } from "@/app/brand/brand-form";
+import { TagManager } from "./tag-manager";
 
 export const metadata = { title: "Cài đặt" };
 
-type Tab = "brand" | "api";
+type Tab = "brand" | "tags" | "api";
 const TABS: { id: Tab; label: string }[] = [
   { id: "brand", label: "Thương hiệu" },
+  { id: "tags", label: "Tag phân loại" },
   { id: "api", label: "API & Sử dụng" },
 ];
 
@@ -47,7 +49,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { tab } = await searchParams;
-  const activeTab: Tab = tab === "api" ? "api" : "brand";
+  const activeTab: Tab = tab === "api" ? "api" : tab === "tags" ? "tags" : "brand";
 
   const [status, usage, brand] = await Promise.all([
     getKeyStatus(),
@@ -82,6 +84,24 @@ export default async function SettingsPage({
               : "Thiết lập thương hiệu của bạn để bắt đầu sinh nội dung."}
           </p>
           <BrandForm brand={brand} />
+        </section>
+      ) : activeTab === "tags" ? (
+        <section>
+          <p className="mb-6 text-sm text-muted-foreground">
+            Danh sách tag dùng để gắn &amp; lọc ý tưởng (VD: Khuyến mãi, Đánh giá, Hướng dẫn).
+            Xóa tag sẽ gỡ tag đó khỏi mọi ý tưởng đang dùng.
+          </p>
+          {brand ? (
+            <TagManager initialTags={brand.tags} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Cần{" "}
+              <Link href="/settings?tab=brand" className="underline">
+                thiết lập Brand Profile
+              </Link>{" "}
+              trước khi quản lý tag.
+            </p>
+          )}
         </section>
       ) : (
         <section>

@@ -24,6 +24,8 @@ export const brand = sqliteTable("brand", {
   audience: text("audience").notNull().default(""),
   // Nguyên tắc tuân thủ cho AI (nhúng vào mọi prompt sinh nội dung).
   guidelines: text("guidelines").notNull().default(""),
+  // Nguyên tắc riêng cho prompt sinh ảnh Gemini (nhúng vào imagePromptPrompt).
+  imagePromptRules: text("image_prompt_rules").notNull().default(""),
   pillars: text("pillars").notNull().default("[]"), // JSON text: string[]
   // Danh sách tag định sẵn để phân loại ý tưởng (quản lý ở Brand Profile).
   tags: text("tags").notNull().default("[]"), // JSON text: string[]

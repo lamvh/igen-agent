@@ -41,10 +41,6 @@ export async function upsertBrand(
     .getAll("pillar")
     .map((v) => String(v).trim())
     .filter((v) => v.length > 0);
-  const tags = formData
-    .getAll("tag")
-    .map((v) => String(v).trim())
-    .filter((v) => v.length > 0);
 
   const parsed = brandSchema.safeParse({
     name: formData.get("name"),
@@ -53,8 +49,8 @@ export async function upsertBrand(
     toneOfVoice: formData.get("toneOfVoice") ?? "",
     audience: formData.get("audience") ?? "",
     guidelines: formData.get("guidelines") ?? "",
+    imagePromptRules: formData.get("imagePromptRules") ?? "",
     pillars,
-    tags,
   });
 
   if (!parsed.success) {
@@ -66,6 +62,8 @@ export async function upsertBrand(
   }
 
   const data = parsed.data;
+  // Không đụng tới `tags` ở đây — tag được quản lý riêng qua addBrandTag/removeBrandTag
+  // (tab Tag phân loại), nên lưu brand không ghi đè danh sách tag hiện có.
   const values = {
     name: data.name,
     industry: data.industry,
@@ -73,8 +71,8 @@ export async function upsertBrand(
     toneOfVoice: data.toneOfVoice,
     audience: data.audience,
     guidelines: data.guidelines,
+    imagePromptRules: data.imagePromptRules,
     pillars: serializeJsonArray(data.pillars),
-    tags: serializeJsonArray(data.tags),
   };
 
   try {
@@ -90,6 +88,7 @@ export async function upsertBrand(
   }
 
   revalidatePath("/brand");
+  revalidatePath("/settings");
   return { success: true, message: "Đã lưu brand profile.", errors: {} };
 }
 
