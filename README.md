@@ -2,7 +2,7 @@
 
 Web app sinh nội dung + quản lý lịch đăng cho **1 thương hiệu** (tiếng Việt). Sinh caption/bài + ý tưởng bằng Claude API, upload ảnh thủ công, hỗ trợ Facebook / Instagram / TikTok. Đăng thủ công (không auto-post). Local-first.
 
-**Stack:** Next.js 16 (App Router) · SQLite + Drizzle ORM · Tailwind + shadcn/ui · zod · Claude API (`claude-opus-4-8`).
+**Stack:** Next.js 16 (App Router) · libSQL/Turso + Drizzle ORM · Tailwind + shadcn/ui · zod · Claude API (`claude-opus-4-8`).
 
 ## Yêu cầu
 
@@ -139,7 +139,7 @@ components/calendar/
 public/uploads/            # ảnh upload (gitignore nội dung)
 db/
   schema.ts                # Drizzle schema (brand, idea, post, asset)
-  index.ts                 # Drizzle client (better-sqlite3)
+  index.ts                 # Drizzle client (libSQL/Turso)
   migrate.ts               # chạy migration
 lib/
   json.ts                  # serialize/parse JSON text (pillars, hashtags...)
@@ -156,10 +156,12 @@ drizzle/                   # file migration sinh ra
 
 ## Deploy (chuẩn bị)
 
-App là **local-first**; deploy public cần ba việc (chưa làm — scaffold khi quyết định deploy):
+App là **local-first**; deploy public (vd Vercel) cần ba việc:
 
-1. **Database**: SQLite → Postgres. Đổi Drizzle driver + `DATABASE_URL` (connection string Postgres).
-2. **Lưu ảnh**: `public/uploads/` không bền trên serverless (filesystem ephemeral) → chuyển object storage (Cloudflare R2 / S3). Sửa `uploadAsset` ghi lên bucket, lưu URL vào `asset.path`.
+1. **Database** ✅ (đã chuyển sang libSQL/Turso — serverless, không cần dựng DB server): driver Drizzle dùng `drizzle-orm/libsql`. Cách dùng:
+   - Local dev: giữ `DATABASE_URL=file:./local.db` (không cần token).
+   - Turso: tạo DB free tại [turso.tech](https://turso.tech), rồi set `DATABASE_URL=libsql://<db>.turso.io` + `TURSO_AUTH_TOKEN=...`. Chạy `npm run db:push` (hoặc `db:migrate`) một lần để tạo bảng. Trên Vercel: thêm 2 biến này vào Environment Variables.
+2. **Lưu ảnh** ⚠️ (chưa làm — vẫn là blocker cho Vercel): `public/uploads/` không bền trên serverless (filesystem read-only/ephemeral) → chuyển object storage (Cloudflare R2 / S3). Sửa `uploadAsset` ghi lên bucket, lưu URL vào `asset.path`. Cho tới khi xong, upload ảnh trên Vercel sẽ thất bại.
 3. **Auth**: thêm đăng nhập (vd Better Auth email/password) trước khi mở public — v1 chưa có auth.
 
 **Bảo mật:** không commit key thật. `.env.local` đã được `.gitignore`; khi deploy dùng secret manager của nền tảng, không hardcode.

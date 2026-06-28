@@ -8,7 +8,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { and, asc, desc, eq, inArray, like, type SQL } from "drizzle-orm";
-import { db } from "@/db";
+import { db, safeRead } from "@/db";
 import { asset, idea, post, type Idea, type Post } from "@/db/schema";
 import { getBrand } from "@/app/actions/brand";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
@@ -65,6 +65,10 @@ const IDEA_PAGE_SIZE = 20;
  * Trả {items, hasMore}; rỗng nếu chưa có brand.
  */
 export async function listIdeas(filter: IdeaFilter = {}): Promise<IdeaPage> {
+  return safeRead(async () => listIdeasInner(filter), { items: [], hasMore: false });
+}
+
+async function listIdeasInner(filter: IdeaFilter): Promise<IdeaPage> {
   const brand = await getBrand();
   if (!brand) return { items: [], hasMore: false };
 
@@ -128,37 +132,45 @@ function toView(row: Post, ideaTitle: string | null): PostView {
 
 /** Lấy 1 post + tiêu đề ý tưởng kèm theo; null nếu không tồn tại. */
 export async function getPost(postId: number): Promise<PostView | null> {
-  const rows = await db.select().from(post).where(eq(post.id, postId)).limit(1);
-  const row = rows[0];
-  if (!row) return null;
+  return safeRead(async () => {
+    const rows = await db.select().from(post).where(eq(post.id, postId)).limit(1);
+    const row = rows[0];
+    if (!row) return null;
 
-  let ideaTitle: string | null = null;
-  if (row.ideaId) {
-    const ir = await db.select({ title: idea.title }).from(idea).where(eq(idea.id, row.ideaId)).limit(1);
-    ideaTitle = ir[0]?.title ?? null;
-  }
-  return toView(row, ideaTitle);
+    let ideaTitle: string | null = null;
+    if (row.ideaId) {
+      const ir = await db.select({ title: idea.title }).from(idea).where(eq(idea.id, row.ideaId)).limit(1);
+      ideaTitle = ir[0]?.title ?? null;
+    }
+    return toView(row, ideaTitle);
+  }, null);
 }
 
 /** Các post cùng ý tưởng (các nền tảng khác) để chuyển nhanh trong editor. */
 export async function getSiblingPosts(ideaId: number): Promise<Pick<Post, "id" | "platform">[]> {
-  return db
-    .select({ id: post.id, platform: post.platform })
-    .from(post)
-    .where(eq(post.ideaId, ideaId))
-    .orderBy(asc(post.id));
+  return safeRead(
+    async () =>
+      db
+        .select({ id: post.id, platform: post.platform })
+        .from(post)
+        .where(eq(post.ideaId, ideaId))
+        .orderBy(asc(post.id)),
+    [],
+  );
 }
 
 /** Tất cả post (full view) của 1 ý tưởng — cho editor 3 tab. Hashtags đã parse. */
 export async function getIdeaPosts(ideaId: number): Promise<PostView[]> {
-  const rows = await db.select().from(post).where(eq(post.ideaId, ideaId)).orderBy(asc(post.id));
-  // Mọi post cùng ý tưởng nên ideaTitle giống nhau — lấy 1 lần.
-  let ideaTitle: string | null = null;
-  if (rows[0]) {
-    const ir = await db.select({ title: idea.title }).from(idea).where(eq(idea.id, ideaId)).limit(1);
-    ideaTitle = ir[0]?.title ?? null;
-  }
-  return rows.map((r) => toView(r, ideaTitle));
+  return safeRead(async () => {
+    const rows = await db.select().from(post).where(eq(post.ideaId, ideaId)).orderBy(asc(post.id));
+    // Mọi post cùng ý tưởng nên ideaTitle giống nhau — lấy 1 lần.
+    let ideaTitle: string | null = null;
+    if (rows[0]) {
+      const ir = await db.select({ title: idea.title }).from(idea).where(eq(idea.id, ideaId)).limit(1);
+      ideaTitle = ir[0]?.title ?? null;
+    }
+    return rows.map((r) => toView(r, ideaTitle));
+  }, []);
 }
 
 /**
@@ -167,6 +179,13 @@ export async function getIdeaPosts(ideaId: number): Promise<PostView[]> {
  * Phạm vi toàn DB (v1 chỉ 1 brand) — nếu sau này nhiều brand cần lọc theo brandId.
  */
 export async function listAllPosts(filters?: {
+  status?: PostStatus;
+  platform?: Platform;
+}): Promise<PostListItem[]> {
+  return safeRead(async () => listAllPostsInner(filters), []);
+}
+
+async function listAllPostsInner(filters?: {
   status?: PostStatus;
   platform?: Platform;
 }): Promise<PostListItem[]> {
@@ -322,9 +341,9 @@ export async function deleteIdea(ideaId: number): Promise<DeleteState> {
     return { success: false, message: "Ý tưởng không hợp lệ." };
   }
   try {
-    db.transaction((tx) => {
-      tx.update(post).set({ ideaId: null }).where(eq(post.ideaId, ideaId)).run();
-      tx.delete(idea).where(eq(idea.id, ideaId)).run();
+    await db.transaction(async (tx) => {
+      await tx.update(post).set({ ideaId: null }).where(eq(post.ideaId, ideaId));
+      await tx.delete(idea).where(eq(idea.id, ideaId));
     });
   } catch {
     return { success: false, message: "Xóa ý tưởng thất bại, vui lòng thử lại." };

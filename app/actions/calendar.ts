@@ -8,7 +8,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { and, eq, gte, lt, isNotNull, inArray } from "drizzle-orm";
-import { db } from "@/db";
+import { db, safeRead } from "@/db";
 import { post, asset, type Post } from "@/db/schema";
 import { parseJsonArray } from "@/lib/json";
 import { monthRange } from "@/lib/date";
@@ -16,30 +16,32 @@ import { POST_STATUSES, type CalendarPost, type CalendarActionState, type PostSt
 
 /** Post có scheduledDate trong tháng (year, monthIndex0 = 0-11), kèm thumbnail ảnh đầu. */
 export async function listScheduledPosts(year: number, monthIndex0: number): Promise<CalendarPost[]> {
-  const { start, end } = monthRange(year, monthIndex0);
-  const rows = await db
-    .select()
-    .from(post)
-    .where(and(isNotNull(post.scheduledDate), gte(post.scheduledDate, start), lt(post.scheduledDate, end)));
+  return safeRead(async () => {
+    const { start, end } = monthRange(year, monthIndex0);
+    const rows = await db
+      .select()
+      .from(post)
+      .where(and(isNotNull(post.scheduledDate), gte(post.scheduledDate, start), lt(post.scheduledDate, end)));
 
-  // Gom ảnh đầu tiên của mỗi post để hiện thumbnail (một query inArray).
-  const firstIds = rows
-    .map((r) => parseJsonArray<number>(r.assetIds)[0])
-    .filter((x): x is number => typeof x === "number");
-  const pathById = new Map<number, string>();
-  if (firstIds.length) {
-    const assets = await db.select({ id: asset.id, path: asset.path }).from(asset).where(inArray(asset.id, firstIds));
-    for (const a of assets) pathById.set(a.id, a.path);
-  }
+    // Gom ảnh đầu tiên của mỗi post để hiện thumbnail (một query inArray).
+    const firstIds = rows
+      .map((r) => parseJsonArray<number>(r.assetIds)[0])
+      .filter((x): x is number => typeof x === "number");
+    const pathById = new Map<number, string>();
+    if (firstIds.length) {
+      const assets = await db.select({ id: asset.id, path: asset.path }).from(asset).where(inArray(asset.id, firstIds));
+      for (const a of assets) pathById.set(a.id, a.path);
+    }
 
-  return rows.map((row: Post) => {
-    const firstAssetId = parseJsonArray<number>(row.assetIds)[0];
-    return {
-      ...row,
-      hashtags: parseJsonArray<string>(row.hashtags),
-      thumbnailPath: typeof firstAssetId === "number" ? pathById.get(firstAssetId) ?? null : null,
-    };
-  });
+    return rows.map((row: Post) => {
+      const firstAssetId = parseJsonArray<number>(row.assetIds)[0];
+      return {
+        ...row,
+        hashtags: parseJsonArray<string>(row.hashtags),
+        thumbnailPath: typeof firstAssetId === "number" ? pathById.get(firstAssetId) ?? null : null,
+      };
+    });
+  }, []);
 }
 
 /** Gán/đổi ngày đăng. date=null để bỏ lịch (về draft). */

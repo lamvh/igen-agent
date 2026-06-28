@@ -347,8 +347,8 @@ export async function generateCaption(
   const built = await buildCaptionValue(current, target, length);
   if (!built) return { success: false, message: "Sinh caption thất bại, vui lòng thử lại." };
 
-  const newId = db.transaction((tx) => {
-    const ids = tx
+  const newId = await db.transaction(async (tx) => {
+    const ids = await tx
       .insert(post)
       .values({
         ideaId: current.id,
@@ -357,8 +357,7 @@ export async function generateCaption(
         hashtags: serializeJsonArray(built.hashtags),
         status: "draft",
       })
-      .returning({ id: post.id })
-      .all();
+      .returning({ id: post.id });
     return ids[0]?.id ?? null;
   });
 

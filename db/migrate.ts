@@ -1,18 +1,23 @@
 /**
- * Chạy migration Drizzle lên SQLite.
- * Tạo file local.db + bảng theo dõi migration; áp dụng mọi migration trong ./drizzle.
+ * Chạy migration Drizzle lên libSQL (Turso) hoặc file SQLite local.
+ * Áp dụng mọi migration trong ./drizzle.
+ *
+ * - Local: DATABASE_URL = "file:./local.db".
+ * - Turso: DATABASE_URL = "libsql://<db>.turso.io" + TURSO_AUTH_TOKEN.
  */
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/libsql";
+import { migrate } from "drizzle-orm/libsql/migrator";
+import { createClient } from "@libsql/client";
 
 const dbUrl = process.env.DATABASE_URL ?? "file:./local.db";
-const dbPath = dbUrl.replace(/^file:/, "");
 
-const sqlite = new Database(dbPath);
-const db = drizzle(sqlite);
+const client = createClient({
+  url: dbUrl,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+const db = drizzle(client);
 
-migrate(db, { migrationsFolder: "./drizzle" });
-sqlite.close();
+await migrate(db, { migrationsFolder: "./drizzle" });
+client.close();
 
-console.log(`Migration hoàn tất → ${dbPath}`);
+console.log(`Migration hoàn tất → ${dbUrl}`);

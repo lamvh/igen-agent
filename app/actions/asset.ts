@@ -13,7 +13,7 @@ import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { desc, eq, inArray } from "drizzle-orm";
-import { db } from "@/db";
+import { db, safeRead } from "@/db";
 import { asset, post, type Asset } from "@/db/schema";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
 
@@ -59,15 +59,17 @@ export async function uploadAsset(_prev: UploadState, formData: FormData): Promi
 
 /** Toàn bộ asset (mới nhất trước). */
 export async function listAssets(): Promise<Asset[]> {
-  return db.select().from(asset).orderBy(desc(asset.id));
+  return safeRead(async () => db.select().from(asset).orderBy(desc(asset.id)), []);
 }
 
 /** Asset theo danh sách id (giữ thứ tự đầu vào). */
 export async function getAssetsByIds(ids: number[]): Promise<Asset[]> {
   if (!ids.length) return [];
-  const rows = await db.select().from(asset).where(inArray(asset.id, ids));
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  return ids.map((id) => byId.get(id)).filter((a): a is Asset => Boolean(a));
+  return safeRead(async () => {
+    const rows = await db.select().from(asset).where(inArray(asset.id, ids));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return ids.map((id) => byId.get(id)).filter((a): a is Asset => Boolean(a));
+  }, []);
 }
 
 /**
@@ -87,17 +89,17 @@ export async function deleteAsset(assetId: number): Promise<UploadState> {
 
     // Gỡ assetId khỏi các post tham chiếu (assetIds là JSON number[] nên lọc trong app).
     const usingPosts = await db.select({ id: post.id, assetIds: post.assetIds }).from(post);
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       for (const p of usingPosts) {
         const ids = parseJsonArray<number>(p.assetIds);
         if (ids.includes(assetId)) {
-          tx.update(post)
+          await tx
+            .update(post)
             .set({ assetIds: serializeJsonArray(ids.filter((x) => x !== assetId)) })
-            .where(eq(post.id, p.id))
-            .run();
+            .where(eq(post.id, p.id));
         }
       }
-      tx.delete(asset).where(eq(asset.id, assetId)).run();
+      await tx.delete(asset).where(eq(asset.id, assetId));
     });
   } catch {
     return { success: false, message: "Xóa ảnh thất bại, vui lòng thử lại." };

@@ -7,7 +7,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, safeRead } from "@/db";
 import { brand, idea, type Brand } from "@/db/schema";
 import { brandSchema } from "@/lib/validations/brand";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
@@ -22,14 +22,16 @@ export type BrandFormState = {
 
 /** Lấy brand hiện có (single-row pattern); null nếu chưa thiết lập. */
 export async function getBrand(): Promise<BrandView | null> {
-  const rows = await db.select().from(brand).orderBy(asc(brand.id)).limit(1);
-  const row = rows[0];
-  if (!row) return null;
-  return {
-    ...row,
-    pillars: parseJsonArray<string>(row.pillars),
-    tags: parseJsonArray<string>(row.tags),
-  };
+  return safeRead(async () => {
+    const rows = await db.select().from(brand).orderBy(asc(brand.id)).limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      ...row,
+      pillars: parseJsonArray<string>(row.pillars),
+      tags: parseJsonArray<string>(row.tags),
+    };
+  }, null);
 }
 
 /** Tạo/cập nhật brand. Dùng làm action cho useActionState: (prevState, formData). */
@@ -138,17 +140,17 @@ export async function removeBrandTag(name: string): Promise<TagListResult> {
 
   const next = b.tags.filter((t) => t !== tag);
   try {
-    db.transaction((tx) => {
-      tx.update(brand).set({ tags: serializeJsonArray(next) }).where(eq(brand.id, b.id)).run();
+    await db.transaction(async (tx) => {
+      await tx.update(brand).set({ tags: serializeJsonArray(next) }).where(eq(brand.id, b.id));
       // Gỡ tag khỏi mọi idea đang dùng (tránh tag mồ côi).
-      const ideaRows = tx.select({ id: idea.id, tags: idea.tags }).from(idea).all();
+      const ideaRows = await tx.select({ id: idea.id, tags: idea.tags }).from(idea);
       for (const r of ideaRows) {
         const ideaTags = parseJsonArray<string>(r.tags);
         if (ideaTags.includes(tag)) {
-          tx.update(idea)
+          await tx
+            .update(idea)
             .set({ tags: serializeJsonArray(ideaTags.filter((t) => t !== tag)) })
-            .where(eq(idea.id, r.id))
-            .run();
+            .where(eq(idea.id, r.id));
         }
       }
     });

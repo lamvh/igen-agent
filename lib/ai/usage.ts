@@ -6,7 +6,7 @@
  * ánh số dư thật. Xem số dư thật tại console.anthropic.com.
  */
 import { sql } from "drizzle-orm";
-import { db } from "@/db";
+import { db, safeRead } from "@/db";
 import { usageLog } from "@/db/schema";
 import { CLAUDE_MODEL } from "@/lib/ai/claude-client";
 
@@ -53,6 +53,15 @@ export type UsageSummary = {
 
 /** Tổng token + chi phí ước tính trên toàn bộ nhật ký. */
 export async function getUsageSummary(): Promise<UsageSummary> {
+  return safeRead(async () => computeUsageSummary(), {
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    estimatedCostUsd: 0,
+    callCount: 0,
+  });
+}
+
+async function computeUsageSummary(): Promise<UsageSummary> {
   const rows = await db
     .select({
       model: usageLog.model,
