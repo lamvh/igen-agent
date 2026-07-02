@@ -29,8 +29,10 @@ export function IdeasFilterBar({
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
 
   // Build URL mới giữ nguyên các param khác; bỏ param khi giá trị rỗng.
+  // Đổi bộ lọc luôn quay về trang 1 (bỏ ?page=) để không rơi vào trang rỗng.
   const pushParams = (patch: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
     for (const [key, value] of Object.entries(patch)) {
       if (value) params.set(key, value);
       else params.delete(key);

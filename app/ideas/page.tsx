@@ -11,6 +11,9 @@ import { IdeasGenerator } from "./ideas-generator";
 import { ManualIdeaForm } from "./manual-idea-form";
 import { IdeasFilterBar } from "./ideas-filter-bar";
 import { IdeasList } from "./ideas-list";
+import { PaginationBar } from "@/components/shell/pagination-bar";
+
+const PAGE_SIZE = 18; // khớp IDEA_PAGE_SIZE server; chia hết cho lưới 2 & 3 cột
 
 export const metadata = { title: "Ý tưởng & Caption" };
 
@@ -20,9 +23,15 @@ export const dynamic = "force-dynamic";
 export default async function IdeasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tag?: string; pillar?: string; q?: string; idea?: string }>;
+  searchParams: Promise<{
+    tag?: string;
+    pillar?: string;
+    q?: string;
+    idea?: string;
+    page?: string;
+  }>;
 }) {
-  const { tag, pillar, q, idea: ideaParam } = await searchParams;
+  const { tag, pillar, q, idea: ideaParam, page: pageParam } = await searchParams;
   const brand = await getBrand();
   const keyAvailable = hasApiKey();
   const availableTags = brand?.tags ?? [];
@@ -33,18 +42,33 @@ export default async function IdeasPage({
   const searchFilter = q?.trim() || undefined;
   const filter = { tag: tagFilter, pillar: pillarFilter, search: searchFilter };
 
-  // Trang đầu (SSR); các trang sau tải qua infinite scroll trong IdeasList.
-  const firstPage = brand ? await listIdeas(filter) : { items: [], hasMore: false };
+  // Phân trang ?page=N (SSR) — trang không hợp lệ quy về 1.
+  const pageNum = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const { items: pageItems, total } = brand
+    ? await listIdeas({ ...filter, limit: PAGE_SIZE, offset: (pageNum - 1) * PAGE_SIZE })
+    : { items: [], total: 0 };
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Deep-link ?idea=<id> (link back từ trang nội dung/editor): tự mở panel
-  // ý tưởng đó; nếu không nằm trong trang đầu thì ghim lên đầu danh sách.
+  // ý tưởng đó; nếu không nằm trong trang hiện tại thì ghim lên đầu danh sách.
   const openIdeaId = Number(ideaParam);
   const openIdea =
     brand && Number.isInteger(openIdeaId) && openIdeaId > 0 ? await getIdeaView(openIdeaId) : null;
   const items =
-    openIdea && !firstPage.items.some((it) => it.id === openIdea.id)
-      ? [openIdea, ...firstPage.items]
-      : firstPage.items;
+    openIdea && !pageItems.some((it) => it.id === openIdea.id)
+      ? [openIdea, ...pageItems]
+      : pageItems;
+
+  // URL trang giữ nguyên bộ lọc hiện tại; trang 1 không cần param cho gọn.
+  const hrefFor = (p: number) => {
+    const params = new URLSearchParams();
+    if (searchFilter) params.set("q", searchFilter);
+    if (pillarFilter) params.set("pillar", pillarFilter);
+    if (tagFilter) params.set("tag", tagFilter);
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return qs ? `/ideas?${qs}` : "/ideas";
+  };
 
   const hasActiveFilter = Boolean(tagFilter || pillarFilter || searchFilter);
   const emptyHint = hasActiveFilter
@@ -94,17 +118,14 @@ export default async function IdeasPage({
 
           <IdeasFilterBar pillars={brand.pillars} tags={availableTags} />
 
-          {/* key reset state infinite scroll khi bộ lọc đổi. */}
           <IdeasList
-            key={`${tagFilter ?? ""}|${pillarFilter ?? ""}|${searchFilter ?? ""}`}
-            initialItems={items}
-            initialHasMore={firstPage.hasMore}
+            items={items}
             openIdeaId={openIdea?.id}
-            filter={filter}
             availableTags={availableTags}
             hasApiKey={keyAvailable}
             emptyHint={emptyHint}
           />
+          <PaginationBar page={pageNum} totalPages={totalPages} hrefFor={hrefFor} />
         </>
       )}
     </div>

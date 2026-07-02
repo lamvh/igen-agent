@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardStats } from "@/app/actions/stats";
 import { NAV_ITEMS } from "@/lib/nav";
+import { UsageGuide } from "@/app/usage-guide";
 
 // Đọc số liệu DB lúc request → luôn hiển thị dữ liệu mới nhất.
 export const dynamic = "force-dynamic";
@@ -80,6 +81,10 @@ export default async function Home() {
             </Link>
           );
         })}
+      </div>
+
+      <div className="mt-8">
+        <UsageGuide />
       </div>
     </div>
   );

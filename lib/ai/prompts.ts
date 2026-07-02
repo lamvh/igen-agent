@@ -151,23 +151,62 @@ Write ONE detailed image-generation prompt IN ENGLISH for this social media post
 - Be a single ready-to-paste paragraph. Do NOT include any Vietnamese, explanations, or markdown.${imageRules ? "\n- Strictly follow the image rules listed above." : ""}`;
 }
 
+/** Mức độ chi tiết của dàn ý — từ ngắn gọn tới chuyên sâu. */
+export type OutlineDepth = "brief" | "standard" | "deep";
+
+export const OUTLINE_DEPTH_LABELS: Record<OutlineDepth, string> = {
+  brief: "Ngắn gọn",
+  standard: "Tiêu chuẩn",
+  deep: "Chuyên sâu",
+};
+
+const OUTLINE_DEPTH_RULES: Record<OutlineDepth, string> = {
+  brief: "- points: đúng 3 ý chính, mỗi ý MỘT câu thật ngắn gọn, đi thẳng trọng tâm.",
+  standard: "- points: 3–5 ý chính cần truyền tải (mỗi ý một câu ngắn gọn).",
+  deep: "- points: 5–8 ý chính CHUYÊN SÂU; mỗi ý gồm câu chủ đề kèm 1–2 chi tiết triển khai ngay trong cùng chuỗi (ví dụ cụ thể, số liệu gợi ý, cách làm từng bước).",
+};
+
+/** Góc nhìn của dàn ý — quyết định giọng kể xuyên suốt bài viết sau này. */
+export type OutlinePerspective = "brand" | "personal" | "expert";
+
+export const OUTLINE_PERSPECTIVE_LABELS: Record<OutlinePerspective, string> = {
+  brand: "Giọng thương hiệu",
+  personal: "Cá nhân trải nghiệm",
+  expert: "Chuyên gia",
+};
+
+const OUTLINE_PERSPECTIVE_RULES: Record<OutlinePerspective, string> = {
+  brand: "", // mặc định — brandContext đã định giọng, không cần chỉ thị thêm
+  personal:
+    "Góc nhìn: MỘT CÁ NHÂN chia sẻ trải nghiệm thật — xưng \"mình\", kể chuyện đời thường, cảm xúc chân thật, có chi tiết cá nhân (lần đầu thử, sai lầm đã mắc, bài học rút ra).",
+  expert:
+    "Góc nhìn: CHUYÊN GIA trong ngành — giọng uy tín, phân tích có căn cứ, dẫn nguyên lý/số liệu/kinh nghiệm nghề, giải thích thuật ngữ dễ hiểu, đưa lời khuyên hành động được.",
+};
+
 /**
- * Prompt triển khai 1 tiêu đề ý tưởng thành dàn ý chi tiết (hook + ý chính + CTA).
- * Dàn ý CHUNG cho mọi nền tảng — không bám riêng nền tảng nào.
+ * Prompt triển khai 1 tiêu đề ý tưởng thành dàn ý (hook + ý chính + CTA).
+ * `depth` điều chỉnh số ý và độ sâu; `perspective` chọn giọng kể (thương hiệu/
+ * cá nhân/chuyên gia). Dàn ý CHUNG cho mọi nền tảng.
  */
-export function outlinePrompt(brand: BrandView, ideaTitle: string): string {
+export function outlinePrompt(
+  brand: BrandView,
+  ideaTitle: string,
+  depth: OutlineDepth = "standard",
+  perspective: OutlinePerspective = "brand",
+): string {
+  const perspectiveRule = OUTLINE_PERSPECTIVE_RULES[perspective];
   return `Bạn là chuyên gia lên dàn ý nội dung mạng xã hội tiếng Việt.
 
 Ngữ cảnh thương hiệu:
 ${brandContext(brand)}
 
 Tiêu đề ý tưởng: "${ideaTitle}"
-
-Hãy triển khai tiêu đề trên thành một dàn ý chi tiết cho bài đăng (dùng chung cho nhiều nền tảng):
+${perspectiveRule ? `\n${perspectiveRule}\n` : ""}
+Hãy triển khai tiêu đề trên thành một dàn ý ${OUTLINE_DEPTH_LABELS[depth].toLowerCase()} cho bài đăng (dùng chung cho nhiều nền tảng):
 - hook: một câu mở đầu thu hút mạnh.
-- points: 3–5 ý chính cần truyền tải (mỗi ý một câu ngắn gọn).
+${OUTLINE_DEPTH_RULES[depth]}
 - cta: một lời kêu gọi hành động phù hợp.
-Tất cả bằng tiếng Việt, bám sát thương hiệu.`;
+Tất cả bằng tiếng Việt, bám sát thương hiệu${perspective !== "brand" ? " và giữ đúng góc nhìn đã nêu" : ""}.`;
 }
 
 /**

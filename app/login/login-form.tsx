@@ -18,14 +18,8 @@ export function LoginForm() {
     <form action={action} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="username">Tên đăng nhập</Label>
-        <Input
-          id="username"
-          name="username"
-          autoComplete="username"
-          autoFocus
-          required
-          placeholder="admin"
-        />
+        {/* Không đặt placeholder gợi ý tài khoản/độ dài mật khẩu thật. */}
+        <Input id="username" name="username" autoComplete="username" autoFocus required />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -36,7 +30,6 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          placeholder="••••••"
         />
       </div>
 

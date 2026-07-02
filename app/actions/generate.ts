@@ -26,6 +26,8 @@ import {
   type IdeaLength,
   type IdeaGoal,
   type CaptionLength,
+  type OutlineDepth,
+  type OutlinePerspective,
 } from "@/lib/ai/prompts";
 import {
   ideaListSchema,
@@ -46,6 +48,8 @@ const TEXT_MAX = 200; // giới hạn độ dài ô target/tone để prompt kh�
 
 const IDEA_LENGTHS: IdeaLength[] = ["short", "medium", "long"];
 const CAPTION_LENGTHS: CaptionLength[] = ["xshort", "short", "medium", "long", "article"];
+const OUTLINE_DEPTHS: OutlineDepth[] = ["brief", "standard", "deep"];
+const OUTLINE_PERSPECTIVES: OutlinePerspective[] = ["brand", "personal", "expert"];
 const IDEA_GOALS: IdeaGoal[] = ["engagement", "sales", "education", "awareness"];
 
 /** Ép kiểu platform an toàn từ input không tin cậy; mặc định facebook. */
@@ -163,8 +167,15 @@ export async function buildIdeaPrompt(formData: FormData): Promise<PromptState> 
   return { success: true, message: "", prompt: ideaPrompt(brand, pillar, opts) };
 }
 
-/** Sinh prompt dàn ý (KHÔNG gọi Claude, không tốn token) để copy sang Claude app. */
-export async function buildOutlinePrompt(ideaId: number): Promise<PromptState> {
+/**
+ * Sinh prompt dàn ý (KHÔNG gọi Claude, không tốn token) để copy sang Claude app.
+ * `depth` do người dùng chọn (ngắn gọn/tiêu chuẩn/chuyên sâu).
+ */
+export async function buildOutlinePrompt(
+  ideaId: number,
+  depth: OutlineDepth = "standard",
+  perspective: OutlinePerspective = "brand",
+): Promise<PromptState> {
   const brand = await getBrand();
   if (!brand) return NO_BRAND;
 
@@ -172,7 +183,15 @@ export async function buildOutlinePrompt(ideaId: number): Promise<PromptState> {
   const current = rows[0];
   if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
 
-  return { success: true, message: "", prompt: outlinePrompt(brand, current.title) };
+  const safeDepth: OutlineDepth = OUTLINE_DEPTHS.includes(depth) ? depth : "standard";
+  const safePerspective: OutlinePerspective = OUTLINE_PERSPECTIVES.includes(perspective)
+    ? perspective
+    : "brand";
+  return {
+    success: true,
+    message: "",
+    prompt: outlinePrompt(brand, current.title, safeDepth, safePerspective),
+  };
 }
 
 /**
@@ -290,7 +309,11 @@ export async function generateImagePromptForPost(postId: number): Promise<Genera
  * Bước 2 quy trình: triển khai 1 tiêu đề ý tưởng thành dàn ý chi tiết, lưu vào idea.outline.
  * Cho phép xem/duyệt bản phác trước khi tốn công sinh caption đầy đủ.
  */
-export async function generateOutline(ideaId: number): Promise<GenerateState> {
+export async function generateOutline(
+  ideaId: number,
+  depth: OutlineDepth = "standard",
+  perspective: OutlinePerspective = "brand",
+): Promise<GenerateState> {
   if (!hasApiKey()) return NO_KEY;
 
   const brand = await getBrand();
@@ -300,6 +323,10 @@ export async function generateOutline(ideaId: number): Promise<GenerateState> {
   const current = rows[0];
   if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
 
+  const safeDepth: OutlineDepth = OUTLINE_DEPTHS.includes(depth) ? depth : "standard";
+  const safePerspective: OutlinePerspective = OUTLINE_PERSPECTIVES.includes(perspective)
+    ? perspective
+    : "brand";
   let outlineText = "";
   try {
     const client = getClaudeClient();
@@ -307,7 +334,9 @@ export async function generateOutline(ideaId: number): Promise<GenerateState> {
       model: CLAUDE_MODEL,
       max_tokens: 4096,
       output_config: { effort: "low", format: zodOutputFormat(ideaOutlineSchema) },
-      messages: [{ role: "user", content: outlinePrompt(brand, current.title) }],
+      messages: [
+        { role: "user", content: outlinePrompt(brand, current.title, safeDepth, safePerspective) },
+      ],
     });
     await logUsage("outline", result.usage);
     const parsed = result.parsed_output;

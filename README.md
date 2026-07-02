@@ -6,6 +6,27 @@ Web app sinh nội dung + quản lý lịch đăng cho **1 thương hiệu** (ti
 
 **Stack:** Next.js 16 (App Router) · libSQL/Turso + Drizzle ORM · Tailwind + shadcn/ui · zod · Claude API (`claude-opus-4-8`).
 
+### Tính năng nổi bật
+
+- 🏷️ **[Brand Profile](#brand-profile-brand)** — thiết lập thương hiệu 1 lần, làm ngữ cảnh cho mọi nội dung sinh ra.
+- 💡 **[Ý tưởng & Caption](#ý-tưởng--caption-ideas)** — sinh ý tưởng + caption theo từng nền tảng bằng Claude, hoặc **copy prompt** dán sang AI khác (không tốn token).
+- 📝 **[Nội dung](#nội-dung-posts)** — xem mọi caption (kể cả nháp), gom theo ý tưởng, lọc trạng thái/nền tảng.
+- ✏️ **[Soạn caption](#soạn-caption-editorpostid)** — sửa caption/hashtags, gắn ảnh, gán ngày đăng.
+- 📅 **[Lịch nội dung](#lịch-nội-dung-calendar)** — lịch tháng theo ngày đăng, đổi trạng thái, copy caption để đăng thủ công.
+- 🖼️ **[Thư viện ảnh](#thư-viện-ảnh-assets)** — upload ảnh, gắn vào bài đăng.
+- 🔐 **[Đăng nhập](#đăng-nhập-login)** — cổng auth chặn toàn bộ app, cookie ký HMAC.
+
+### Luồng sử dụng
+
+1. **Đăng nhập** tại `/login` (mặc định `admin` / `admin`).
+2. **Tạo Brand Profile** tại `/brand` — tên, ngành, tông giọng, content pillars.
+3. **Sinh ý tưởng** tại `/ideas`: chọn pillar + nền tảng → Claude sinh ~6 ý tưởng (hoặc nhập tay / copy prompt nếu không có key).
+4. **Tạo caption** từ ý tưởng → app sinh bản nháp riêng cho từng nền tảng và mở trình soạn thảo.
+5. **Soạn & lên lịch** tại `/editor/[postId]`: chỉnh caption, gắn ảnh từ thư viện, gán ngày đăng.
+6. **Theo dõi trên lịch** tại `/calendar`: đến ngày đăng, bấm **Copy** để lấy caption + hashtags rồi đăng thủ công lên nền tảng, sau đó đổi trạng thái thành "Đã đăng".
+
+Chi tiết từng tính năng xem mục [Tính năng](#tính-năng) bên dưới.
+
 ## Yêu cầu
 
 - Node 18+
@@ -63,16 +84,16 @@ Sinh nội dung bằng Claude (`claude-opus-4-8`), dùng ngữ cảnh từ Brand
 - Output dùng **structured outputs** (zod) nên parse an toàn, không lo JSON hỏng.
 - **Không có `ANTHROPIC_API_KEY` vẫn dùng được đầy đủ**:
   - **Lưu ý tưởng thủ công** (chỉ cần tiêu đề, không gọi Claude).
-  - **Copy prompt** (ý tưởng / dàn ý / content) — sinh đúng prompt mà API dùng, không tốn token. Prompt content là brief đầy đủ nhất (ý tưởng + dàn ý + brand context + quy tắc nền tảng, độ dài tùy chọn) để dán sang Claude app hoặc AI agent bất kỳ triển khai thành bài hoàn chỉnh. Copy được ngay trong panel ý tưởng (chọn nền tảng + độ dài, không cần tạo post trước) hoặc trong editor của post.
+  - **Copy prompt** (ý tưởng / dàn ý / content) — sinh đúng prompt mà API dùng, không tốn token. Dàn ý có tùy chọn mức độ (Ngắn gọn / Tiêu chuẩn / Chuyên sâu) + góc nhìn (Giọng thương hiệu / Cá nhân trải nghiệm / Chuyên gia), áp dụng cho cả tạo bằng API lẫn copy prompt. Prompt content là brief đầy đủ nhất (ý tưởng + dàn ý + brand context + quy tắc nền tảng, độ dài tùy chọn) để dán sang Claude app hoặc AI agent bất kỳ triển khai thành bài hoàn chỉnh. Copy được ngay trong panel ý tưởng (chọn nền tảng + độ dài, không cần tạo post trước) hoặc trong editor của post.
   - **Tạo nháp trống** cho 1 nền tảng → mở trình soạn, dán caption lấy từ Claude app rồi lưu như bình thường.
 
 ### Nội dung (`/posts`)
 
 Xem **mọi caption đã tạo, gồm bản nháp** (không cần lên lịch mới thấy):
 
-- Danh sách phẳng, mới nhất trước; mỗi mục có badge nền tảng + trạng thái, snippet caption, thumbnail, ngày đăng (nếu có).
-- Lọc theo trạng thái (Nháp / Đã lên lịch / Đã đăng) và nền tảng.
-- Click mở trình soạn để sửa/lên lịch/gắn ảnh.
+- Lưới card gom theo chủ đề (ý tưởng), mới nhất trước; mỗi card có thumbnail, tiêu đề ý tưởng, snippet caption và chip từng nền tảng (kèm chấm màu trạng thái) — bấm chip mở trình soạn của đúng bài đó.
+- Lọc theo trạng thái (Nháp / Đã lên lịch / Đã đăng) và nền tảng; phân trang 20 bài/trang (`?page=N`).
+- Trang `/ideas` cũng phân trang 18 ý tưởng/trang (bỏ infinite scroll).
 - Link back về ý tưởng gốc: icon 💡 trên mỗi nhóm (và tên ý tưởng trong editor) mở thẳng panel ý tưởng qua deep-link `/ideas?idea=<id>`.
 
 ### Soạn caption (`/editor/[postId]`)

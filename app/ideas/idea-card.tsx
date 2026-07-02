@@ -73,7 +73,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
+import {
+  PLATFORM_LABELS,
+  OUTLINE_DEPTH_LABELS,
+  OUTLINE_PERSPECTIVE_LABELS,
+  type Platform,
+  type OutlineDepth,
+  type OutlinePerspective,
+} from "@/lib/ai/prompts";
+
+const outlineSelectClass = "h-8 rounded-lg border border-input bg-background px-2 text-xs";
 
 /**
  * Editor dàn ý trong panel: sửa tay (textarea + Lưu) + tinh chỉnh bằng AI
@@ -84,11 +93,16 @@ function OutlineEditor({
   outline,
   versions,
   hasApiKey,
+  depth,
+  perspective,
 }: {
   ideaId: number;
   outline: string | null;
   versions: OutlineVersion[];
   hasApiKey: boolean;
+  /** Mức độ + góc nhìn đang chọn ở section Dàn ý — dùng cho copy prompt. */
+  depth: OutlineDepth;
+  perspective: OutlinePerspective;
 }) {
   const router = useRouter();
   const [text, setText] = useState(outline ?? "");
@@ -161,7 +175,7 @@ function OutlineEditor({
 
       {/* Copy prompt dàn ý (không tốn token) — hiện bất kể có API key. */}
       <CopyPromptButton
-        action={() => buildOutlinePrompt(ideaId)}
+        action={() => buildOutlinePrompt(ideaId, depth, perspective)}
         label="Copy prompt dàn ý"
       />
 
@@ -281,6 +295,9 @@ export function IdeaCard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const hasDetail = Boolean(idea.outline || idea.imagePrompt);
+  // Tùy chọn dàn ý — áp dụng cho cả "Tạo dàn ý" (API) lẫn "Copy prompt dàn ý".
+  const [outlineDepth, setOutlineDepth] = useState<OutlineDepth>("standard");
+  const [outlinePerspective, setOutlinePerspective] = useState<OutlinePerspective>("brand");
 
   // Đóng panel deep-link thì gỡ ?idea= khỏi URL (giữ các filter khác) để
   // refresh/back không mở lại panel ngoài ý muốn.
@@ -452,11 +469,38 @@ export function IdeaCard({
                 </span>
                 {hasApiKey && (
                   <GenerateButton
-                    action={() => generateOutline(idea.id)}
+                    action={() => generateOutline(idea.id, outlineDepth, outlinePerspective)}
                     label={idea.outline ? "Tạo lại" : "Tạo dàn ý"}
                     pendingLabel="Đang tạo…"
                   />
                 )}
+              </div>
+              {/* Tùy chọn mức độ + góc nhìn — áp dụng cho tạo bằng AI lẫn copy prompt. */}
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <select
+                  aria-label="Mức độ chi tiết dàn ý"
+                  value={outlineDepth}
+                  onChange={(e) => setOutlineDepth(e.target.value as OutlineDepth)}
+                  className={outlineSelectClass}
+                >
+                  {(Object.keys(OUTLINE_DEPTH_LABELS) as OutlineDepth[]).map((k) => (
+                    <option key={k} value={k}>
+                      {OUTLINE_DEPTH_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Góc nhìn dàn ý"
+                  value={outlinePerspective}
+                  onChange={(e) => setOutlinePerspective(e.target.value as OutlinePerspective)}
+                  className={outlineSelectClass}
+                >
+                  {(Object.keys(OUTLINE_PERSPECTIVE_LABELS) as OutlinePerspective[]).map((k) => (
+                    <option key={k} value={k}>
+                      {OUTLINE_PERSPECTIVE_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
               </div>
               <OutlineEditor
                 key={idea.outline ?? "empty"}
@@ -464,6 +508,8 @@ export function IdeaCard({
                 outline={idea.outline}
                 versions={idea.outlineVersions}
                 hasApiKey={hasApiKey}
+                depth={outlineDepth}
+                perspective={outlinePerspective}
               />
             </section>
 

@@ -7,7 +7,7 @@
  * - saveCaption: lưu chỉnh sửa caption + hashtags thủ công (cũng dùng khi thiếu API key).
  */
 import { revalidatePath } from "next/cache";
-import { and, asc, desc, eq, inArray, like, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, sql, type SQL } from "drizzle-orm";
 import { db, safeRead } from "@/db";
 import { asset, idea, post, type Idea, type Post } from "@/db/schema";
 import { getBrand } from "@/app/actions/brand";
@@ -52,10 +52,11 @@ export type IdeaFilter = {
   offset?: number;
 };
 
-/** Một "trang" ý tưởng + cờ còn dữ liệu để infinite scroll biết có nên tải tiếp. */
-export type IdeaPage = { items: IdeaView[]; hasMore: boolean };
+/** Một "trang" ý tưởng + tổng số ý tưởng khớp filter (để dựng phân trang). */
+export type IdeaPage = { items: IdeaView[]; total: number };
 
-const IDEA_PAGE_SIZE = 20;
+const IDEA_PAGE_SIZE = 18; // chia hết cho lưới 2 & 3 cột
+const POST_PAGE_SIZE = 20;
 
 export type ManualIdeaState = { success: boolean; message: string };
 
@@ -136,12 +137,12 @@ export async function createEmptyPost(ideaId: number, platform: Platform): Promi
  * Trả {items, hasMore}; rỗng nếu chưa có brand.
  */
 export async function listIdeas(filter: IdeaFilter = {}): Promise<IdeaPage> {
-  return safeRead(async () => listIdeasInner(filter), { items: [], hasMore: false });
+  return safeRead(async () => listIdeasInner(filter), { items: [], total: 0 });
 }
 
 async function listIdeasInner(filter: IdeaFilter): Promise<IdeaPage> {
   const brand = await getBrand();
-  if (!brand) return { items: [], hasMore: false };
+  if (!brand) return { items: [], total: 0 };
 
   const limit = filter.limit ?? IDEA_PAGE_SIZE;
   const offset = filter.offset ?? 0;
@@ -159,17 +160,21 @@ async function listIdeasInner(filter: IdeaFilter): Promise<IdeaPage> {
     conditions.push(like(idea.tags, `%${escapeLike(JSON.stringify(filter.tag.trim()))}%`));
   }
 
-  // Lấy limit+1 để biết còn trang sau mà không cần count toàn bảng.
-  const rows = await db
-    .select()
-    .from(idea)
-    .where(and(...conditions))
-    .orderBy(desc(idea.id))
-    .limit(limit + 1)
-    .offset(offset);
-
-  const hasMore = rows.length > limit;
-  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  // Trang hiện tại + tổng số dòng khớp filter (count nhẹ với SQLite local).
+  const [pageRows, countRows] = await Promise.all([
+    db
+      .select()
+      .from(idea)
+      .where(and(...conditions))
+      .orderBy(desc(idea.id))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(idea)
+      .where(and(...conditions)),
+  ]);
+  const total = Number(countRows[0]?.n ?? 0);
 
   // Gom post của các ý tưởng bằng 1 query (tránh N+1), rồi nhóm theo ideaId.
   const ideaIds = pageRows.map((r) => r.id);
@@ -194,7 +199,7 @@ async function listIdeasInner(filter: IdeaFilter): Promise<IdeaPage> {
     outlineVersions: parseOutlineVersions(r.outlineVersions),
     posts: postsByIdea.get(r.id) ?? [],
   }));
-  return { items, hasMore };
+  return { items, total };
 }
 
 /**
@@ -267,31 +272,43 @@ export async function getIdeaPosts(ideaId: number): Promise<PostView[]> {
   }, []);
 }
 
+/** Bộ lọc + phân trang cho danh sách post (/posts). */
+export type PostListFilter = {
+  status?: PostStatus;
+  platform?: Platform;
+  limit?: number;
+  offset?: number;
+};
+
+/** Một "trang" post + tổng số post khớp filter (để dựng phân trang). */
+export type PostListPage = { items: PostListItem[]; total: number };
+
 /**
- * Tất cả post (mới nhất trước), lọc tùy chọn theo status + platform.
+ * Post (mới nhất trước) có phân trang, lọc tùy chọn theo status + platform.
  * Kèm tiêu đề ý tưởng + thumbnail (ảnh đầu) để hiện trong danh sách /posts.
  * Phạm vi toàn DB (v1 chỉ 1 brand) — nếu sau này nhiều brand cần lọc theo brandId.
  */
-export async function listAllPosts(filters?: {
-  status?: PostStatus;
-  platform?: Platform;
-}): Promise<PostListItem[]> {
-  return safeRead(async () => listAllPostsInner(filters), []);
+export async function listAllPosts(filters?: PostListFilter): Promise<PostListPage> {
+  return safeRead(async () => listAllPostsInner(filters), { items: [], total: 0 });
 }
 
-async function listAllPostsInner(filters?: {
-  status?: PostStatus;
-  platform?: Platform;
-}): Promise<PostListItem[]> {
+async function listAllPostsInner(filters?: PostListFilter): Promise<PostListPage> {
   const conds = [];
   if (filters?.status) conds.push(eq(post.status, filters.status));
   if (filters?.platform) conds.push(eq(post.platform, filters.platform));
+  const where = conds.length ? and(...conds) : undefined;
 
-  const rows = await db
-    .select()
-    .from(post)
-    .where(conds.length ? and(...conds) : undefined)
-    .orderBy(desc(post.id));
+  const [rows, countRows] = await Promise.all([
+    db
+      .select()
+      .from(post)
+      .where(where)
+      .orderBy(desc(post.id))
+      .limit(filters?.limit ?? POST_PAGE_SIZE)
+      .offset(filters?.offset ?? 0),
+    db.select({ n: sql<number>`count(*)` }).from(post).where(where),
+  ]);
+  const total = Number(countRows[0]?.n ?? 0);
 
   // Gom tiêu đề ý tưởng + ảnh đầu bằng 2 query inArray (tránh N+1).
   const ideaIds = [...new Set(rows.map((r) => r.ideaId).filter((x): x is number => x != null))];
@@ -310,7 +327,7 @@ async function listAllPostsInner(filters?: {
   const titleById = new Map(ideaRows.map((r) => [r.id, r.title]));
   const pathById = new Map(assetRows.map((r) => [r.id, r.path]));
 
-  return rows.map((row) => {
+  const items = rows.map((row) => {
     const firstAssetId = parseJsonArray<number>(row.assetIds)[0];
     return {
       ...row,
@@ -319,6 +336,7 @@ async function listAllPostsInner(filters?: {
       thumbnailPath: typeof firstAssetId === "number" ? pathById.get(firstAssetId) ?? null : null,
     };
   });
+  return { items, total };
 }
 
 /** Lưu chỉnh sửa caption + hashtags. useActionState: (prev, formData) với postId qua hidden field. */
