@@ -6,7 +6,7 @@
  * bên trong chặn lan (stopPropagation) để không mở nhầm panel.
  */
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, ListChecks, ImageIcon, FileText, ArrowUpRight, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -268,13 +268,31 @@ export function IdeaCard({
   idea,
   availableTags,
   hasApiKey,
+  initialOpen = false,
 }: {
   idea: IdeaCardData;
   availableTags: string[];
   hasApiKey: boolean;
+  /** Deep-link ?idea=<id>: mở sẵn panel chi tiết khi mount. */
+  initialOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const hasDetail = Boolean(idea.outline || idea.imagePrompt);
+
+  // Đóng panel deep-link thì gỡ ?idea= khỏi URL (giữ các filter khác) để
+  // refresh/back không mở lại panel ngoài ý muốn.
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next && initialOpen && searchParams.has("idea")) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("idea");
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    }
+  }
 
   // Trích câu Hook từ dàn ý (format "Hook: ...\n\nNội dung chính:...") làm snippet.
   // Nếu không khớp, lấy dòng đầu tiên không rỗng.
@@ -367,7 +385,7 @@ export function IdeaCard({
       </div>
 
       {/* Panel chi tiết trượt từ phải. */}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           showCloseButton
           className="top-0 right-0 left-auto flex h-svh max-h-svh w-full max-w-2xl translate-x-0 translate-y-0 flex-col items-stretch gap-0 space-y-4 overflow-y-auto rounded-none rounded-l-2xl p-5 sm:max-w-2xl data-open:slide-in-from-right data-closed:slide-out-to-right"

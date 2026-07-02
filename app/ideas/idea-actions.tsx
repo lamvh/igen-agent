@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { DeleteButton } from "@/components/shell/delete-button";
-import { generateCaption } from "@/app/actions/generate";
+import { CopyPromptButton } from "@/components/shell/copy-prompt-button";
+import { generateCaption, buildContentPrompt } from "@/app/actions/generate";
 import { addBrandTag, removeBrandTag } from "@/app/actions/brand";
 import { deleteIdea, updateIdeaTags, createEmptyPost } from "@/app/actions/post";
 import {
@@ -131,6 +132,17 @@ export function CaptionCreator({ ideaId, hasApiKey }: { ideaId: number; hasApiKe
         {pendingEmpty ? <Spinner /> : <FilePlus className="size-4" />}
         {pendingEmpty ? "Đang tạo nháp…" : "Tạo nháp trống"}
       </Button>
+      {/* Copy prompt content (không tốn token) — brief đầy đủ (ý tưởng + dàn ý +
+          brand + nền tảng + độ dài đã chọn ở trên) để đưa sang AI agent bất kỳ
+          viết bài hoàn chỉnh, rồi dán ngược vào nháp trống. */}
+      <CopyPromptButton
+        action={() =>
+          canCreate
+            ? buildContentPrompt(ideaId, platform as Platform, length as CaptionLength)
+            : Promise.resolve({ success: false, message: "Vui lòng chọn nền tảng và độ dài." })
+        }
+        label="Copy prompt content"
+      />
       {error && (
         <p className="text-xs text-destructive" aria-live="polite">
           {error}

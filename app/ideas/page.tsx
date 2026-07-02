@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { Lightbulb, ArrowRight } from "lucide-react";
 import { getBrand } from "@/app/actions/brand";
-import { listIdeas } from "@/app/actions/post";
+import { listIdeas, getIdeaView } from "@/app/actions/post";
 import { hasApiKey } from "@/lib/ai/claude-client";
 import { IdeasGenerator } from "./ideas-generator";
 import { ManualIdeaForm } from "./manual-idea-form";
@@ -20,9 +20,9 @@ export const dynamic = "force-dynamic";
 export default async function IdeasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tag?: string; pillar?: string; q?: string }>;
+  searchParams: Promise<{ tag?: string; pillar?: string; q?: string; idea?: string }>;
 }) {
-  const { tag, pillar, q } = await searchParams;
+  const { tag, pillar, q, idea: ideaParam } = await searchParams;
   const brand = await getBrand();
   const keyAvailable = hasApiKey();
   const availableTags = brand?.tags ?? [];
@@ -36,10 +36,20 @@ export default async function IdeasPage({
   // Trang đầu (SSR); các trang sau tải qua infinite scroll trong IdeasList.
   const firstPage = brand ? await listIdeas(filter) : { items: [], hasMore: false };
 
+  // Deep-link ?idea=<id> (link back từ trang nội dung/editor): tự mở panel
+  // ý tưởng đó; nếu không nằm trong trang đầu thì ghim lên đầu danh sách.
+  const openIdeaId = Number(ideaParam);
+  const openIdea =
+    brand && Number.isInteger(openIdeaId) && openIdeaId > 0 ? await getIdeaView(openIdeaId) : null;
+  const items =
+    openIdea && !firstPage.items.some((it) => it.id === openIdea.id)
+      ? [openIdea, ...firstPage.items]
+      : firstPage.items;
+
   const hasActiveFilter = Boolean(tagFilter || pillarFilter || searchFilter);
   const emptyHint = hasActiveFilter
     ? "Không khớp bộ lọc hiện tại. Thử đổi tag/pillar hoặc xóa từ khóa tìm kiếm."
-    : "Chọn pillar ở trên rồi bấm “Sinh ý tưởng” để bắt đầu.";
+    : "Nhập tiêu đề vào ô “Thêm ý tưởng nhanh” ở trên, hoặc mở “Sinh ý tưởng bằng AI”.";
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
@@ -71,12 +81,14 @@ export default async function IdeasPage({
         </div>
       ) : (
         <>
-          <div className="grid gap-6 lg:grid-cols-2">
+          {/* Khu tạo ý tưởng: quick-add 1 dòng + card AI gập/mở — gọn để danh
+              sách ý tưởng (nội dung chính) hiện ngay trên fold. */}
+          <div className="space-y-3">
             <ManualIdeaForm pillars={brand.pillars} />
             <IdeasGenerator pillars={brand.pillars} hasApiKey={keyAvailable} />
           </div>
 
-          <div className="mt-10 mb-3 flex items-baseline gap-2">
+          <div className="mt-8 mb-3 flex items-baseline gap-2">
             <h2 className="text-lg font-semibold">Ý tưởng</h2>
           </div>
 
@@ -85,8 +97,9 @@ export default async function IdeasPage({
           {/* key reset state infinite scroll khi bộ lọc đổi. */}
           <IdeasList
             key={`${tagFilter ?? ""}|${pillarFilter ?? ""}|${searchFilter ?? ""}`}
-            initialItems={firstPage.items}
+            initialItems={items}
             initialHasMore={firstPage.hasMore}
+            openIdeaId={openIdea?.id}
             filter={filter}
             availableTags={availableTags}
             hasApiKey={keyAvailable}

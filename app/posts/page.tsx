@@ -7,6 +7,7 @@
  */
 import Link from "next/link";
 import Image from "next/image";
+import { Lightbulb } from "lucide-react";
 import { listAllPosts, deletePost, type PostListItem } from "@/app/actions/post";
 import { POST_STATUSES, type PostStatus } from "@/lib/post-status";
 import { PLATFORMS, PLATFORM_LABELS, type Platform } from "@/lib/ai/prompts";
@@ -127,8 +128,19 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
             const platforms = platformsOf(g.posts);
             return (
               <li key={g.key} className="relative">
-                {/* Xóa bài đại diện ngay tại item (bài khác cùng chủ đề xóa trong editor). */}
-                <div className="absolute right-2 top-2 z-10">
+                {/* Mở ý tưởng gốc + xóa bài đại diện — đặt ngoài Link chính
+                    (cả item đã là link vào editor, không lồng link được). */}
+                <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+                  {g.ideaId != null && (
+                    <Link
+                      href={`/ideas?idea=${g.ideaId}`}
+                      title="Mở ý tưởng gốc"
+                      aria-label="Mở ý tưởng gốc"
+                      className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+                    >
+                      <Lightbulb className="size-4" />
+                    </Link>
+                  )}
                   <DeleteButton
                     action={async () => {
                       "use server";

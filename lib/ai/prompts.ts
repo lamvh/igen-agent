@@ -204,19 +204,24 @@ Hãy cập nhật lại dàn ý theo yêu cầu trên, vẫn giữ cấu trúc:
 Bám sát dàn ý hiện tại, chỉ thay đổi những gì yêu cầu nêu ra. Tất cả bằng tiếng Việt.`;
 }
 
-/** Độ dài caption — ánh xạ sang hướng dẫn cụ thể trong prompt. */
-export type CaptionLength = "short" | "medium" | "long";
+/** Độ dài content — 5 mức, từ 1–2 câu tới bài website rất chi tiết. */
+export type CaptionLength = "xshort" | "short" | "medium" | "long" | "article";
 
 export const CAPTION_LENGTH_LABELS: Record<CaptionLength, string> = {
-  short: "Ngắn (1–2 câu)",
-  medium: "Vừa",
-  long: "Dài, chi tiết",
+  xshort: "Rất ngắn (1–2 câu)",
+  short: "Ngắn (3–5 câu)",
+  medium: "Vừa (1–3 đoạn)",
+  long: "Dài (nhiều đoạn, kể chuyện)",
+  article: "Bài website rất chi tiết",
 };
 
 const CAPTION_LENGTH_RULES: Record<CaptionLength, string> = {
-  short: "Độ dài: RẤT NGẮN, chỉ 1–2 câu súc tích, đi thẳng vào trọng tâm.",
-  medium: "Độ dài: vừa phải, khoảng 3–5 câu.",
-  long: "Độ dài: dài và chi tiết, nhiều đoạn, kể chuyện/giải thích kỹ.",
+  xshort: "Độ dài: RẤT NGẮN, chỉ 1–2 câu súc tích, đi thẳng vào trọng tâm.",
+  short: "Độ dài: ngắn gọn, khoảng 3–5 câu trong một đoạn.",
+  medium: "Độ dài: vừa phải, khoảng 1–3 đoạn ngắn (~100–200 từ).",
+  long: "Độ dài: dài và chi tiết, nhiều đoạn (~300–600 từ), kể chuyện/giải thích kỹ.",
+  article:
+    "Độ dài: BÀI VIẾT RẤT DÀI VÀ CHI TIẾT chuẩn website/blog (tối thiểu ~1000–1500 từ): mở bài dẫn dắt, thân bài chia nhiều phần với tiêu đề phụ, phân tích sâu kèm ví dụ cụ thể, kết bài có CTA.",
 };
 
 /**

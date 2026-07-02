@@ -21,6 +21,7 @@ export function IdeasList({
   availableTags,
   hasApiKey,
   emptyHint,
+  openIdeaId,
 }: {
   initialItems: IdeaView[];
   initialHasMore: boolean;
@@ -29,6 +30,8 @@ export function IdeasList({
   availableTags: string[];
   hasApiKey: boolean;
   emptyHint: string;
+  /** Deep-link ?idea=<id>: card khớp id sẽ tự mở panel chi tiết. */
+  openIdeaId?: number;
 }) {
   // Chỉ giữ các trang load thêm trong client state; trang đầu lấy thẳng từ
   // server props (initialItems) nên luôn phản ánh data mới sau revalidate +
@@ -91,7 +94,7 @@ export function IdeasList({
 
   return (
     <>
-      <ul className="grid gap-4 sm:grid-cols-2">
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => (
           <li key={it.id}>
             <IdeaCard
@@ -107,6 +110,7 @@ export function IdeasList({
               }}
               availableTags={availableTags}
               hasApiKey={hasApiKey}
+              initialOpen={it.id === openIdeaId}
             />
           </li>
         ))}

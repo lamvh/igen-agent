@@ -197,6 +197,29 @@ async function listIdeasInner(filter: IdeaFilter): Promise<IdeaPage> {
   return { items, hasMore };
 }
 
+/**
+ * Lấy 1 ý tưởng đầy đủ (IdeaView) theo id — phục vụ deep-link /ideas?idea=<id>
+ * (link back từ trang nội dung/editor về đúng panel ý tưởng). Null nếu không có.
+ */
+export async function getIdeaView(ideaId: number): Promise<IdeaView | null> {
+  return safeRead(async () => {
+    const rows = await db.select().from(idea).where(eq(idea.id, ideaId)).limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    const postRows = await db
+      .select({ id: post.id, platform: post.platform })
+      .from(post)
+      .where(eq(post.ideaId, ideaId))
+      .orderBy(asc(post.id));
+    return {
+      ...row,
+      tags: parseJsonArray<string>(row.tags),
+      outlineVersions: parseOutlineVersions(row.outlineVersions),
+      posts: postRows,
+    };
+  }, null);
+}
+
 function toView(row: Post, ideaTitle: string | null): PostView {
   return { ...row, hashtags: parseJsonArray<string>(row.hashtags), ideaTitle };
 }

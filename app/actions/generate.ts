@@ -45,7 +45,7 @@ const IDEA_COUNT_MAX = 10;
 const TEXT_MAX = 200; // giới hạn độ dài ô target/tone để prompt không phình.
 
 const IDEA_LENGTHS: IdeaLength[] = ["short", "medium", "long"];
-const CAPTION_LENGTHS: CaptionLength[] = ["short", "medium", "long"];
+const CAPTION_LENGTHS: CaptionLength[] = ["xshort", "short", "medium", "long", "article"];
 const IDEA_GOALS: IdeaGoal[] = ["engagement", "sales", "education", "awareness"];
 
 /** Ép kiểu platform an toàn từ input không tin cậy; mặc định facebook. */
@@ -176,9 +176,31 @@ export async function buildOutlinePrompt(ideaId: number): Promise<PromptState> {
 }
 
 /**
- * Sinh prompt content (KHÔNG gọi Claude, không tốn token) — content brief đầy đủ
- * (ý tưởng + dàn ý + brand context) để copy sang AI agent bất kỳ. `length` do
- * người dùng chọn ở editor.
+ * Sinh prompt content từ 1 Ý TƯỞNG (KHÔNG gọi Claude, không tốn token) — content
+ * brief đầy đủ (ý tưởng + dàn ý + brand context + quy tắc nền tảng) để copy sang
+ * AI agent bất kỳ, không cần tạo post trước. Dùng ở panel ý tưởng.
+ */
+export async function buildContentPrompt(
+  ideaId: number,
+  platform: Platform,
+  length: CaptionLength,
+): Promise<PromptState> {
+  const brand = await getBrand();
+  if (!brand) return NO_BRAND;
+
+  const rows = await db.select().from(idea).where(eq(idea.id, ideaId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
+
+  const safeLength: CaptionLength = CAPTION_LENGTHS.includes(length) ? length : "medium";
+  const prompt = captionPrompt(brand, current.title, toPlatform(platform), current.outline, safeLength);
+  return { success: true, message: "", prompt };
+}
+
+/**
+ * Sinh prompt content cho 1 POST đã có (KHÔNG gọi Claude, không tốn token) —
+ * cùng brief như buildContentPrompt nhưng nền tảng lấy từ post. Dùng trong editor
+ * (vd muốn nhờ AI ngoài viết lại content với độ dài khác).
  */
 export async function buildCaptionPrompt(
   postId: number,

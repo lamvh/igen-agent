@@ -53,8 +53,17 @@ export default async function EditorPage({ params }: { params: Promise<{ postId:
       </div>
 
       <h1 className="mt-4 text-2xl font-bold tracking-tight">Soạn nội dung</h1>
-      {post.ideaTitle && (
-        <p className="mt-1 text-sm text-muted-foreground">Ý tưởng: {post.ideaTitle}</p>
+      {post.ideaTitle && post.ideaId && (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ý tưởng:{" "}
+          {/* Deep-link mở đúng panel ý tưởng (xem dàn ý, copy prompt…). */}
+          <Link
+            href={`/ideas?idea=${post.ideaId}`}
+            className="font-medium text-primary hover:underline"
+          >
+            {post.ideaTitle}
+          </Link>
+        </p>
       )}
 
       <div className="mt-6">
