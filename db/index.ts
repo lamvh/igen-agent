@@ -10,7 +10,9 @@ import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
 import * as schema from "./schema";
 
-const DATABASE_URL = process.env.DATABASE_URL ?? "file:./local.db";
+// Dùng `||` (không phải `??`) để chuỗi rỗng "" cũng fallback về file local,
+// tránh bẫy: URL rỗng khiến isRemote=false → isDbAvailable=false → data trống thầm lặng.
+const DATABASE_URL = process.env.DATABASE_URL || "file:./local.db";
 
 // URL remote (Turso) mới dùng được trên serverless; "file:" chỉ chạy local.
 const isRemote = /^(libsql|https?|wss?):/.test(DATABASE_URL);
