@@ -75,6 +75,7 @@ function PlatformPanel({
           caption={caption}
           hashtags={hashtags}
           imagePaths={imagePaths}
+          title={post.ideaTitle ?? undefined}
         />
       </div>
     </div>

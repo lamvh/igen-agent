@@ -14,11 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { CopyButton } from "@/components/shell/copy-button";
+import { CopyPromptButton } from "@/components/shell/copy-prompt-button";
 import { IdeaActions, CaptionCreator } from "./idea-actions";
 import {
   generateOutline,
   generateImagePromptForIdea,
   refineOutline,
+  buildOutlinePrompt,
   type GenerateState,
 } from "@/app/actions/generate";
 import {
@@ -157,6 +159,12 @@ function OutlineEditor({
         {msg && <span className="text-xs text-green-600">{msg}</span>}
       </div>
 
+      {/* Copy prompt dàn ý (không tốn token) — hiện bất kể có API key. */}
+      <CopyPromptButton
+        action={() => buildOutlinePrompt(ideaId)}
+        label="Copy prompt dàn ý"
+      />
+
       {/* Tinh chỉnh bằng AI theo yêu cầu. */}
       {hasApiKey && outline && (
         <div className="space-y-2 rounded-lg border border-dashed p-2.5">
@@ -242,6 +250,7 @@ const PLATFORM_BADGE: Record<string, string> = {
   facebook: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
   instagram: "bg-pink-100 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300",
   tiktok: "bg-neutral-200 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200",
+  blog: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
 };
 
 export type IdeaCardData = {
@@ -384,15 +393,13 @@ export function IdeaCard({
               ))}
             </div>
 
-            {/* Tạo caption: chọn nền tảng + độ dài rồi sinh nội dung. */}
-            {hasApiKey && (
-              <section>
-                <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
-                  <Sparkles className="size-4 text-primary" /> Tạo nội dung
-                </div>
-                <CaptionCreator ideaId={idea.id} />
-              </section>
-            )}
+            {/* Tạo caption: bằng AI (cần key) hoặc tạo nháp trống để dán nội dung ngoài. */}
+            <section>
+              <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+                <Sparkles className="size-4 text-primary" /> Tạo nội dung
+              </div>
+              <CaptionCreator ideaId={idea.id} hasApiKey={hasApiKey} />
+            </section>
 
             {/* Nội dung đã tạo từ ý tưởng — link thẳng vào editor. */}
             {idea.posts.length > 0 && (

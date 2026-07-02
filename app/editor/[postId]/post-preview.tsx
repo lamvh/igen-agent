@@ -18,6 +18,7 @@ const ASPECT: Record<Platform, string> = {
   facebook: "aspect-[1.91/1]",
   instagram: "aspect-[4/5]",
   tiktok: "aspect-[9/16]",
+  blog: "aspect-[16/9]",
 };
 
 function Avatar({ name }: { name: string }) {
@@ -164,15 +165,36 @@ function TikTokFrame(props: PreviewProps) {
   );
 }
 
+/** Blog/Website: tiêu đề (từ ý tưởng) → thân bài dạng caption dài, không có hàng action social. */
+function BlogFrame(props: PreviewProps) {
+  return (
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <MediaFrame platform="blog" imagePath={props.imagePaths[0] ?? null} alt={props.brandName} />
+      <div className="p-4">
+        <p className="text-xs font-medium text-muted-foreground">{props.brandName}</p>
+        <h3 className="mt-1 text-lg font-semibold leading-snug">
+          {props.title || props.brandName}
+        </h3>
+        <div className="mt-3">
+          <CaptionText caption={props.caption} hashtags={props.hashtags} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type PreviewProps = {
   platform: Platform;
   brandName: string;
   caption: string;
   hashtags: string[];
   imagePaths: string[];
+  /** Tiêu đề bài viết — dùng cho preview blog (lấy từ idea.title). */
+  title?: string;
 };
 
 export function PostPreview(props: PreviewProps) {
+  if (props.platform === "blog") return <BlogFrame {...props} />;
   if (props.platform === "instagram") return <InstagramFrame {...props} />;
   if (props.platform === "tiktok") return <TikTokFrame {...props} />;
   return <FacebookFrame {...props} />;

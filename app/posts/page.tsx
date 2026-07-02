@@ -26,6 +26,7 @@ const PLATFORM_COLOR: Record<string, string> = {
   facebook: "bg-blue-100 text-blue-700",
   instagram: "bg-pink-100 text-pink-700",
   tiktok: "bg-neutral-200 text-neutral-800",
+  blog: "bg-amber-100 text-amber-700",
 };
 
 type Search = { status?: string; platform?: string };

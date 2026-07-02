@@ -7,14 +7,15 @@
  * Tách riêng để card tối giản, mọi thao tác sinh nội dung gom vào panel.
  */
 import { useState, useTransition } from "react";
-import { Tag, Check, Sparkles, Plus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Tag, Check, Sparkles, Plus, X, FilePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { DeleteButton } from "@/components/shell/delete-button";
 import { generateCaption } from "@/app/actions/generate";
 import { addBrandTag, removeBrandTag } from "@/app/actions/brand";
-import { deleteIdea, updateIdeaTags } from "@/app/actions/post";
+import { deleteIdea, updateIdeaTags, createEmptyPost } from "@/app/actions/post";
 import {
   PLATFORMS,
   PLATFORM_LABELS,
@@ -31,15 +32,22 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-/** Chọn nền tảng + độ dài → Tạo caption. Dùng trong panel chi tiết. */
-export function CaptionCreator({ ideaId }: { ideaId: number }) {
+/**
+ * Chọn nền tảng (+độ dài) → Tạo caption bằng AI, hoặc "Tạo nháp trống" (không API)
+ * để dán caption sinh từ nguồn ngoài. Dùng trong panel chi tiết.
+ */
+export function CaptionCreator({ ideaId, hasApiKey }: { ideaId: number; hasApiKey: boolean }) {
+  const router = useRouter();
   // Người dùng phải tự chọn nền tảng + độ dài (placeholder rỗng, không mặc định).
   const [platform, setPlatform] = useState<Platform | "">("");
   const [length, setLength] = useState<CaptionLength | "">("");
   const [pending, start] = useTransition();
+  const [pendingEmpty, startEmpty] = useTransition();
   const [error, setError] = useState("");
 
   const canCreate = platform !== "" && length !== "";
+  const canCreateEmpty = platform !== "";
+  const busy = pending || pendingEmpty;
 
   function onCreate() {
     if (!canCreate) {
@@ -54,6 +62,19 @@ export function CaptionCreator({ ideaId }: { ideaId: number }) {
     });
   }
 
+  function onCreateEmpty() {
+    if (!canCreateEmpty) {
+      setError("Vui lòng chọn nền tảng.");
+      return;
+    }
+    setError("");
+    startEmpty(async () => {
+      const res = await createEmptyPost(ideaId, platform as Platform);
+      if (res.success && res.postId) router.push(`/editor/${res.postId}`);
+      else setError(res.message);
+    });
+  }
+
   return (
     <div className="space-y-2 rounded-xl bg-muted/40 p-3">
       <div className="grid grid-cols-2 gap-2">
@@ -61,7 +82,7 @@ export function CaptionCreator({ ideaId }: { ideaId: number }) {
           aria-label="Nền tảng"
           value={platform}
           onChange={(e) => setPlatform(e.target.value as Platform)}
-          disabled={pending}
+          disabled={busy}
           className={`h-9 rounded-lg border border-input bg-background px-2 text-sm ${
             platform === "" ? "text-muted-foreground" : ""
           }`}
@@ -79,7 +100,7 @@ export function CaptionCreator({ ideaId }: { ideaId: number }) {
           aria-label="Độ dài"
           value={length}
           onChange={(e) => setLength(e.target.value as CaptionLength)}
-          disabled={pending}
+          disabled={busy}
           className={`h-9 rounded-lg border border-input bg-background px-2 text-sm ${
             length === "" ? "text-muted-foreground" : ""
           }`}
@@ -94,14 +115,21 @@ export function CaptionCreator({ ideaId }: { ideaId: number }) {
           ))}
         </select>
       </div>
+      {hasApiKey && (
+        <Button type="button" onClick={onCreate} disabled={busy || !canCreate} className="w-full">
+          {pending ? <Spinner /> : <Sparkles className="size-4" />}
+          {pending ? "Đang tạo caption…" : "Tạo caption"}
+        </Button>
+      )}
       <Button
         type="button"
-        onClick={onCreate}
-        disabled={pending || !canCreate}
+        variant="outline"
+        onClick={onCreateEmpty}
+        disabled={busy || !canCreateEmpty}
         className="w-full"
       >
-        {pending ? <Spinner /> : <Sparkles className="size-4" />}
-        {pending ? "Đang tạo caption…" : "Tạo caption"}
+        {pendingEmpty ? <Spinner /> : <FilePlus className="size-4" />}
+        {pendingEmpty ? "Đang tạo nháp…" : "Tạo nháp trống"}
       </Button>
       {error && (
         <p className="text-xs text-destructive" aria-live="polite">

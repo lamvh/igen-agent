@@ -15,8 +15,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { CopyButton } from "@/components/shell/copy-button";
+import { CopyPromptButton } from "@/components/shell/copy-prompt-button";
 import { saveCaption, type PostView, type SaveCaptionState } from "@/app/actions/post";
-import { regenerateCaption, generateImagePromptForPost } from "@/app/actions/generate";
+import {
+  regenerateCaption,
+  generateImagePromptForPost,
+  buildCaptionPrompt,
+} from "@/app/actions/generate";
+import { CAPTION_LENGTH_LABELS, type CaptionLength } from "@/lib/ai/prompts";
 
 const initialState: SaveCaptionState = { success: false, message: "" };
 
@@ -39,6 +45,8 @@ export function CaptionEditor({
   const [regenError, setRegenError] = useState("");
   const [imgPending, startImg] = useTransition();
   const [imgError, setImgError] = useState("");
+  // Độ dài mong muốn cho prompt content (copy sang AI agent bất kỳ).
+  const [promptLength, setPromptLength] = useState<CaptionLength>("medium");
 
   // Controlled để preview cập nhật theo từng phím gõ; đồng bộ lại khi post đổi
   // (vd sau regenerate + router.refresh).
@@ -109,6 +117,28 @@ export function CaptionEditor({
           onChange={(e) => setCaption(e.target.value)}
         />
         {regenError && <p className="text-sm text-destructive">{regenError}</p>}
+        {/* Prompt content = brief đầy đủ (ý tưởng + dàn ý + brand context) để đưa
+            sang AI agent bất kỳ; độ dài do người dùng chọn. */}
+        <div className="flex flex-wrap items-start gap-2">
+          <select
+            aria-label="Độ dài content"
+            value={promptLength}
+            onChange={(e) => setPromptLength(e.target.value as CaptionLength)}
+            className="h-8 rounded-lg border border-input bg-background px-2 text-xs"
+          >
+            {(Object.keys(CAPTION_LENGTH_LABELS) as CaptionLength[]).map((k) => (
+              <option key={k} value={k}>
+                {CAPTION_LENGTH_LABELS[k]}
+              </option>
+            ))}
+          </select>
+          <div className="min-w-0 flex-1">
+            <CopyPromptButton
+              action={() => buildCaptionPrompt(post.id, promptLength)}
+              label="Copy prompt content"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">

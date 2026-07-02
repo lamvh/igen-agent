@@ -8,6 +8,7 @@ import { getBrand } from "@/app/actions/brand";
 import { listIdeas } from "@/app/actions/post";
 import { hasApiKey } from "@/lib/ai/claude-client";
 import { IdeasGenerator } from "./ideas-generator";
+import { ManualIdeaForm } from "./manual-idea-form";
 import { IdeasFilterBar } from "./ideas-filter-bar";
 import { IdeasList } from "./ideas-list";
 
@@ -70,7 +71,10 @@ export default async function IdeasPage({
         </div>
       ) : (
         <>
-          <IdeasGenerator pillars={brand.pillars} hasApiKey={keyAvailable} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ManualIdeaForm pillars={brand.pillars} />
+            <IdeasGenerator pillars={brand.pillars} hasApiKey={keyAvailable} />
+          </div>
 
           <div className="mt-10 mb-3 flex items-baseline gap-2">
             <h2 className="text-lg font-semibold">Ý tưởng</h2>

@@ -4,13 +4,14 @@
  * Idea Generator (Client Component).
  * Chọn pillar → sinh ý tưởng (chung cho mọi nền tảng). Ẩn nút generate nếu thiếu API key.
  */
-import { useActionState } from "react";
+import { useActionState, useRef } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { generateIdeas, type GenerateState } from "@/app/actions/generate";
+import { CopyPromptButton } from "@/components/shell/copy-prompt-button";
+import { generateIdeas, buildIdeaPrompt, type GenerateState } from "@/app/actions/generate";
 import {
   IDEA_LENGTH_LABELS,
   IDEA_GOAL_LABELS,
@@ -32,19 +33,14 @@ export function IdeasGenerator({
   hasApiKey: boolean;
 }) {
   const [state, formAction, pending] = useActionState(generateIdeas, initialState);
-
-  if (!hasApiKey) {
-    return (
-      <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-        Chưa cấu hình <code className="font-mono">ANTHROPIC_API_KEY</code>. Thêm key vào{" "}
-        <code className="font-mono">.env.local</code> rồi khởi động lại để sinh ý tưởng tự động.
-        Bạn vẫn có thể tạo/sửa caption thủ công trong trình soạn thảo.
-      </div>
-    );
-  }
+  const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <form action={formAction} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm"
+    >
       <div className="flex items-center gap-2 border-b pb-3">
         <Sparkles className="size-4 text-primary" />
         <h2 className="font-heading text-sm font-semibold">Sinh ý tưởng bằng AI</h2>
@@ -117,10 +113,17 @@ export function IdeasGenerator({
       </p>
 
       <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-        <Button type="submit" disabled={pending}>
-          {pending ? <Spinner /> : <Sparkles className="size-4" />}
-          {pending ? "Đang sinh…" : "Sinh ý tưởng"}
-        </Button>
+        {hasApiKey ? (
+          <Button type="submit" disabled={pending}>
+            {pending ? <Spinner /> : <Sparkles className="size-4" />}
+            {pending ? "Đang sinh…" : "Sinh ý tưởng"}
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Chưa cấu hình <code className="font-mono">ANTHROPIC_API_KEY</code> — không thể sinh tự
+            động. Copy prompt bên dưới để dùng với Claude app.
+          </p>
+        )}
         {state.message && (
           <p
             className={state.success ? "text-sm text-green-600" : "text-sm text-destructive"}
@@ -129,6 +132,13 @@ export function IdeasGenerator({
             {state.message}
           </p>
         )}
+      </div>
+
+      <div className="border-t pt-4">
+        <CopyPromptButton
+          action={() => buildIdeaPrompt(new FormData(formRef.current!))}
+          label="Copy prompt ý tưởng"
+        />
       </div>
     </form>
   );

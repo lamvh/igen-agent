@@ -13,7 +13,7 @@ import { asset, idea, post, type Idea, type Post } from "@/db/schema";
 import { getBrand } from "@/app/actions/brand";
 import { parseJsonArray, serializeJsonArray } from "@/lib/json";
 import type { PostStatus } from "@/lib/post-status";
-import type { Platform } from "@/lib/ai/prompts";
+import { PLATFORMS, type Platform } from "@/lib/ai/prompts";
 import {
   appendOutlineVersion,
   parseOutlineVersions,
@@ -56,6 +56,77 @@ export type IdeaFilter = {
 export type IdeaPage = { items: IdeaView[]; hasMore: boolean };
 
 const IDEA_PAGE_SIZE = 20;
+
+export type ManualIdeaState = { success: boolean; message: string };
+
+const TITLE_MAX = 300; // chặn tiêu đề quá dài từ input không tin cậy, tránh vỡ layout thẻ ý tưởng.
+
+/**
+ * Lưu 1 ý tưởng thủ công — không gọi Claude, không tốn token.
+ * Dùng khi thiếu ANTHROPIC_API_KEY hoặc khi người dùng muốn tự nhập tiêu đề.
+ */
+export async function createIdeaManual(
+  _prev: ManualIdeaState,
+  formData: FormData,
+): Promise<ManualIdeaState> {
+  const title = String(formData.get("title") ?? "").trim().slice(0, TITLE_MAX);
+  if (!title) return { success: false, message: "Vui lòng nhập tiêu đề ý tưởng." };
+
+  const brand = await getBrand();
+  if (!brand) return { success: false, message: "Vui lòng tạo Brand Profile trước." };
+
+  const pillar = String(formData.get("pillar") ?? "").trim() || null;
+
+  try {
+    await db.insert(idea).values({ brandId: brand.id, title, pillar, status: "draft" });
+  } catch {
+    return { success: false, message: "Lưu ý tưởng thất bại, vui lòng thử lại." };
+  }
+
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã lưu ý tưởng." };
+}
+
+export type EmptyPostState = { success: boolean; message: string; postId?: number };
+
+/**
+ * Tạo 1 post nháp trống (caption rỗng) — không gọi Claude, không tốn token.
+ * Dùng để dán caption sinh từ nguồn ngoài (vd Claude app) vào editor sẵn có.
+ * Chặn trùng: mỗi ý tưởng chỉ 1 post cho mỗi nền tảng (giống generateCaptionForPlatform).
+ */
+export async function createEmptyPost(ideaId: number, platform: Platform): Promise<EmptyPostState> {
+  if (!Number.isInteger(ideaId) || ideaId <= 0) {
+    return { success: false, message: "Ý tưởng không hợp lệ." };
+  }
+  if (!PLATFORMS.includes(platform)) {
+    return { success: false, message: "Nền tảng không hợp lệ." };
+  }
+
+  const ideaRows = await db.select({ id: idea.id }).from(idea).where(eq(idea.id, ideaId)).limit(1);
+  if (!ideaRows[0]) return { success: false, message: "Không tìm thấy ý tưởng." };
+
+  const existing = await db
+    .select({ id: post.id })
+    .from(post)
+    .where(and(eq(post.ideaId, ideaId), eq(post.platform, platform)))
+    .limit(1);
+  if (existing[0]) return { success: false, message: "Nền tảng này đã có nội dung." };
+
+  let postId: number | undefined;
+  try {
+    const ids = await db
+      .insert(post)
+      .values({ ideaId, platform, caption: "", status: "draft" })
+      .returning({ id: post.id });
+    postId = ids[0]?.id;
+  } catch {
+    return { success: false, message: "Tạo nháp thất bại, vui lòng thử lại." };
+  }
+  if (postId === undefined) return { success: false, message: "Tạo nháp thất bại, vui lòng thử lại." };
+
+  revalidatePath("/ideas");
+  return { success: true, message: "Đã tạo nháp.", postId };
+}
 
 /**
  * Ý tưởng của brand hiện tại (mới nhất trước), có lọc + phân trang.

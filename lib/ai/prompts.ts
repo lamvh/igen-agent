@@ -4,14 +4,15 @@
  */
 import type { BrandView } from "@/app/actions/brand";
 
-export type Platform = "facebook" | "instagram" | "tiktok";
+export type Platform = "facebook" | "instagram" | "tiktok" | "blog";
 
-export const PLATFORMS: Platform[] = ["facebook", "instagram", "tiktok"];
+export const PLATFORMS: Platform[] = ["facebook", "instagram", "tiktok", "blog"];
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   facebook: "Facebook",
   instagram: "Instagram",
   tiktok: "TikTok",
+  blog: "Website/Blog",
 };
 
 /** Quy tắc nội dung từng nền tảng — đưa vào prompt caption. */
@@ -22,6 +23,7 @@ const PLATFORM_RULES: Record<Platform, string> = {
     "Instagram: caption ngắn gọn, bắt mắt, nhiều emoji phù hợp, kết bằng 5-12 hashtag liên quan.",
   tiktok:
     "TikTok: hook cực mạnh ở câu đầu (3 giây vàng), giọng trẻ trung, CTA rõ ràng, 3-6 hashtag xu hướng.",
+  blog: "Website/Blog: bài dài chuẩn SEO, có mở bài–thân bài–kết bài rõ ràng, có thể chèn tiêu đề phụ, giọng chuẩn thương hiệu. Ít hoặc không dùng hashtag.",
 };
 
 /**
@@ -218,8 +220,9 @@ const CAPTION_LENGTH_RULES: Record<CaptionLength, string> = {
 };
 
 /**
- * Prompt sinh caption + hashtags cho 1 ý tưởng trên 1 nền tảng.
- * Nếu có dàn ý (outline) thì viết caption bám theo dàn ý đó để chất lượng cao hơn.
+ * Prompt sinh caption/content + hashtags cho 1 ý tưởng trên 1 nền tảng.
+ * Đây là content brief ĐẦY ĐỦ NHẤT (ý tưởng + dàn ý + ngữ cảnh brand + quy tắc
+ * nền tảng) — dùng cho cả lời gọi API lẫn copy-prompt đưa sang AI agent bất kỳ.
  * `length` điều chỉnh độ dài caption (mặc định medium).
  */
 export function captionPrompt(
@@ -229,16 +232,19 @@ export function captionPrompt(
   outline?: string | null,
   length: CaptionLength = "medium",
 ): string {
-  return `Bạn là chuyên gia viết caption mạng xã hội tiếng Việt.
+  return `Bạn là chuyên gia viết nội dung mạng xã hội tiếng Việt.
 
 Ngữ cảnh thương hiệu:
 ${brandContext(brand)}
 
 Ý tưởng: "${ideaTitle}"
-${outline ? `\nDàn ý cần bám theo:\n${outline}\n` : ""}
+${outline ? `\nDàn ý cần bám theo (hook → ý chính → CTA):\n${outline}\n` : ""}
 Quy tắc nền tảng — ${PLATFORM_RULES[platform]}
+
+Hãy triển khai ${outline ? "ý tưởng và dàn ý" : "ý tưởng"} trên thành bài viết/caption HOÀN CHỈNH, sẵn sàng đăng, bằng tiếng Việt.
 
 Yêu cầu:
 - ${CAPTION_LENGTH_RULES[length]}
-- Viết caption hoàn chỉnh bằng tiếng Việt theo đúng quy tắc nền tảng trên${outline ? " và bám sát dàn ý" : ""}, kèm danh sách hashtag (không bao gồm dấu # trong từng phần tử mảng).`;
+- Tuân thủ đúng quy tắc nền tảng${outline ? "; bám sát dàn ý, không bỏ sót ý chính nào" : ""}, bám sát tông giọng và nguyên tắc thương hiệu ở trên.
+- Kèm danh sách hashtag (không bao gồm dấu # trong từng phần tử).`;
 }

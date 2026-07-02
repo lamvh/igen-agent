@@ -45,6 +45,7 @@ const IDEA_COUNT_MAX = 10;
 const TEXT_MAX = 200; // giới hạn độ dài ô target/tone để prompt không phình.
 
 const IDEA_LENGTHS: IdeaLength[] = ["short", "medium", "long"];
+const CAPTION_LENGTHS: CaptionLength[] = ["short", "medium", "long"];
 const IDEA_GOALS: IdeaGoal[] = ["engagement", "sales", "education", "awareness"];
 
 /** Ép kiểu platform an toàn từ input không tin cậy; mặc định facebook. */
@@ -136,6 +137,71 @@ export async function generateIdeas(_prev: GenerateState, formData: FormData): P
 
   revalidatePath("/ideas");
   return { success: true, message: `Đã sinh ${savedCount} ý tưởng.` };
+}
+
+export type PromptState = GenerateState & { prompt?: string };
+
+/**
+ * Sinh prompt ý tưởng (KHÔNG gọi Claude, không tốn token) để copy sang Claude app.
+ * Cùng tham số + cùng hàm dựng prompt với generateIdeas nên prompt copy = prompt API.
+ */
+export async function buildIdeaPrompt(formData: FormData): Promise<PromptState> {
+  const brand = await getBrand();
+  if (!brand) return NO_BRAND;
+
+  const pillar = String(formData.get("pillar") ?? "").trim();
+  if (!pillar) return { success: false, message: "Vui lòng chọn/nhập content pillar." };
+
+  const opts = {
+    count: toCount(formData.get("count")),
+    length: toLength(formData.get("length")),
+    goal: toGoal(formData.get("goal")),
+    target: toOptionalText(formData.get("target")),
+    tone: toOptionalText(formData.get("tone")),
+  };
+
+  return { success: true, message: "", prompt: ideaPrompt(brand, pillar, opts) };
+}
+
+/** Sinh prompt dàn ý (KHÔNG gọi Claude, không tốn token) để copy sang Claude app. */
+export async function buildOutlinePrompt(ideaId: number): Promise<PromptState> {
+  const brand = await getBrand();
+  if (!brand) return NO_BRAND;
+
+  const rows = await db.select().from(idea).where(eq(idea.id, ideaId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy ý tưởng." };
+
+  return { success: true, message: "", prompt: outlinePrompt(brand, current.title) };
+}
+
+/**
+ * Sinh prompt content (KHÔNG gọi Claude, không tốn token) — content brief đầy đủ
+ * (ý tưởng + dàn ý + brand context) để copy sang AI agent bất kỳ. `length` do
+ * người dùng chọn ở editor.
+ */
+export async function buildCaptionPrompt(
+  postId: number,
+  length: CaptionLength = "medium",
+): Promise<PromptState> {
+  const brand = await getBrand();
+  if (!brand) return NO_BRAND;
+
+  const rows = await db.select().from(post).where(eq(post.id, postId)).limit(1);
+  const current = rows[0];
+  if (!current) return { success: false, message: "Không tìm thấy post." };
+
+  let ideaTitle = "";
+  let outline: string | null = null;
+  if (current.ideaId) {
+    const ir = await db.select().from(idea).where(eq(idea.id, current.ideaId)).limit(1);
+    ideaTitle = ir[0]?.title ?? "";
+    outline = ir[0]?.outline ?? null;
+  }
+
+  const safeLength: CaptionLength = CAPTION_LENGTHS.includes(length) ? length : "medium";
+  const prompt = captionPrompt(brand, ideaTitle || "(nội dung tự do)", toPlatform(current.platform), outline, safeLength);
+  return { success: true, message: "", prompt };
 }
 
 /** Gọi Claude sinh 1 image-generation prompt từ nội dung cho trước; null nếu lỗi. */
