@@ -95,6 +95,15 @@ Quản lý ảnh để gắn vào bài đăng (local-first):
 
 > Ảnh upload không được commit (gitignore `public/uploads/*`). Khi deploy serverless cần chuyển sang object storage (R2/S3) — xem mục Deploy.
 
+### Đăng nhập (`/login`)
+
+Cổng đăng nhập đơn giản chặn truy cập toàn bộ app (chống lộ dữ liệu):
+
+- **`proxy.ts`** (Next.js 16 — thay cho middleware) chặn mọi route trừ `/login`; chưa đăng nhập → chuyển về `/login`.
+- Phiên lưu trong cookie `httpOnly` **ký HMAC-SHA256** (`node:crypto`, không thêm dependency); cookie giả/sửa sẽ bị từ chối.
+- **Thông tin mặc định: `admin` / `admin`.** Đổi bằng biến môi trường `AUTH_USERNAME` / `AUTH_PASSWORD`; đặt `SESSION_SECRET` (chuỗi ngẫu nhiên) khi deploy — nhờ vậy mật khẩu thật không nằm trong repo.
+- Nút **Đăng xuất** ở cuối thanh điều hướng (xóa phiên).
+
 ### Dashboard (`/`) & Cài đặt (`/settings`)
 
 - **Dashboard**: số liệu nhanh (số ý tưởng, post theo trạng thái nháp/đã lên lịch/đã đăng) + điều hướng tới mọi mục; empty state khi chưa có brand.
@@ -103,8 +112,12 @@ Quản lý ảnh để gắn vào bài đăng (local-first):
 ## Cấu trúc thư mục
 
 ```
+proxy.ts                   # cổng auth: chặn route chưa đăng nhập (Next.js 16)
 app/
   page.tsx                 # dashboard (số liệu + điều hướng)
+  login/
+    page.tsx               # trang đăng nhập (Server Component)
+    login-form.tsx         # form đăng nhập (Client)
   settings/
     page.tsx               # cài đặt: trạng thái key (Server Component)
     claude-test-button.tsx # test key Claude (Client)
@@ -133,6 +146,7 @@ app/
     asset.ts               # uploadAsset, listAssets, attachAssetToPost
     stats.ts               # getDashboardStats
     settings.ts            # getKeyStatus, testClaudeKey
+    auth.ts                # login, logout (server actions)
 components/calendar/
   month-grid.tsx           # lưới tháng (Server Component)
   post-card.tsx            # thẻ post: thumbnail + badge + đổi trạng thái + copy (Client)
@@ -142,6 +156,10 @@ db/
   index.ts                 # Drizzle client (libSQL/Turso)
   migrate.ts               # chạy migration
 lib/
+  auth/
+    config.ts              # thông tin đăng nhập + secret (env đè mặc định)
+    token.ts               # ký/kiểm cookie HMAC (dùng cả trong proxy)
+    session.ts             # tạo/xóa/đọc phiên qua cookie (server-only)
   json.ts                  # serialize/parse JSON text (pillars, hashtags...)
   date.ts                  # helper ngày local + lưới tháng
   post-status.ts           # hằng số + kiểu trạng thái/calendar (client dùng được)
@@ -162,7 +180,7 @@ App là **local-first**; deploy public (vd Vercel) cần ba việc:
    - Local dev: giữ `DATABASE_URL=file:./local.db` (không cần token).
    - Turso: tạo DB free tại [turso.tech](https://turso.tech), rồi set `DATABASE_URL=libsql://<db>.turso.io` + `TURSO_AUTH_TOKEN=...`. Chạy `npm run db:push` (hoặc `db:migrate`) một lần để tạo bảng. Trên Vercel: thêm 2 biến này vào Environment Variables.
 2. **Lưu ảnh** ⚠️ (chưa làm — vẫn là blocker cho Vercel): `public/uploads/` không bền trên serverless (filesystem read-only/ephemeral) → chuyển object storage (Cloudflare R2 / S3). Sửa `uploadAsset` ghi lên bucket, lưu URL vào `asset.path`. Cho tới khi xong, upload ảnh trên Vercel sẽ thất bại.
-3. **Auth**: thêm đăng nhập (vd Better Auth email/password) trước khi mở public — v1 chưa có auth.
+3. **Auth** ✅ (đã có cổng đăng nhập admin): xem mục **Đăng nhập** bên dưới. Trước khi mở public, đổi mật khẩu + đặt `SESSION_SECRET`.
 
 **Bảo mật:** không commit key thật. `.env.local` đã được `.gitignore`; khi deploy dùng secret manager của nền tảng, không hardcode.
 

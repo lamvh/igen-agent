@@ -49,6 +49,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new StorageEvent("storage"));
   }
 
+  // Trang đăng nhập nằm ngoài app: bỏ chrome (rail + header), render toàn màn.
+  if (pathname === "/login") {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex h-svh overflow-hidden bg-background">
       <DesktopSidebar hidden={desktopHidden} />

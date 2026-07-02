@@ -10,6 +10,7 @@ import { usePathname } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { NAV_ITEMS, isActivePath } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { LogoutButton } from "@/components/shell/logout-button";
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -78,11 +79,21 @@ export function DesktopSidebar({ hidden = false }: { hidden?: boolean }) {
       <div className="flex-1 overflow-y-auto p-2">
         <NavLinks />
       </div>
+      <div className="border-t border-sidebar-border p-2">
+        <LogoutButton />
+      </div>
     </aside>
   );
 }
 
 /** Nội dung nav dùng trong dialog mobile. */
 export function MobileNav({ onNavigate }: { onNavigate?: () => void }) {
-  return <NavLinks onNavigate={onNavigate} />;
+  return (
+    <div className="flex flex-col gap-2">
+      <NavLinks onNavigate={onNavigate} />
+      <div className="border-t border-sidebar-border pt-2">
+        <LogoutButton />
+      </div>
+    </div>
+  );
 }
