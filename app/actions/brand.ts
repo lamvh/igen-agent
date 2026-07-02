@@ -52,6 +52,7 @@ export async function upsertBrand(
     audience: formData.get("audience") ?? "",
     guidelines: formData.get("guidelines") ?? "",
     imagePromptRules: formData.get("imagePromptRules") ?? "",
+    immigrationRules: formData.get("immigrationRules") ?? "",
     pillars,
   });
 
@@ -74,6 +75,7 @@ export async function upsertBrand(
     audience: data.audience,
     guidelines: data.guidelines,
     imagePromptRules: data.imagePromptRules,
+    immigrationRules: data.immigrationRules,
     pillars: serializeJsonArray(data.pillars),
   };
 

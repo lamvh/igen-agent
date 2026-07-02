@@ -296,8 +296,9 @@ export function IdeaCard({
   const searchParams = useSearchParams();
   const hasDetail = Boolean(idea.outline || idea.imagePrompt);
   // Tùy chọn dàn ý — áp dụng cho cả "Tạo dàn ý" (API) lẫn "Copy prompt dàn ý".
-  const [outlineDepth, setOutlineDepth] = useState<OutlineDepth>("standard");
-  const [outlinePerspective, setOutlinePerspective] = useState<OutlinePerspective>("brand");
+  // Mặc định "auto": không ép mức độ/giọng văn, AI tự quyết định.
+  const [outlineDepth, setOutlineDepth] = useState<OutlineDepth>("auto");
+  const [outlinePerspective, setOutlinePerspective] = useState<OutlinePerspective>("auto");
 
   // Đóng panel deep-link thì gỡ ?idea= khỏi URL (giữ các filter khác) để
   // refresh/back không mở lại panel ngoài ý muốn.

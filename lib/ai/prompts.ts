@@ -151,37 +151,63 @@ Write ONE detailed image-generation prompt IN ENGLISH for this social media post
 - Be a single ready-to-paste paragraph. Do NOT include any Vietnamese, explanations, or markdown.${imageRules ? "\n- Strictly follow the image rules listed above." : ""}`;
 }
 
-/** Mức độ chi tiết của dàn ý — từ ngắn gọn tới chuyên sâu. */
-export type OutlineDepth = "brief" | "standard" | "deep";
+/** Mức độ chi tiết của dàn ý — "auto" để AI tự quyết định theo chủ đề. */
+export type OutlineDepth = "auto" | "brief" | "standard" | "deep";
 
 export const OUTLINE_DEPTH_LABELS: Record<OutlineDepth, string> = {
+  auto: "Độ dài: AI tự quyết định",
   brief: "Ngắn gọn",
   standard: "Tiêu chuẩn",
   deep: "Chuyên sâu",
 };
 
 const OUTLINE_DEPTH_RULES: Record<OutlineDepth, string> = {
+  auto: "- points: các ý chính cần truyền tải — bạn tự quyết định số lượng ý và độ sâu phù hợp nhất với chủ đề.",
   brief: "- points: đúng 3 ý chính, mỗi ý MỘT câu thật ngắn gọn, đi thẳng trọng tâm.",
   standard: "- points: 3–5 ý chính cần truyền tải (mỗi ý một câu ngắn gọn).",
   deep: "- points: 5–8 ý chính CHUYÊN SÂU; mỗi ý gồm câu chủ đề kèm 1–2 chi tiết triển khai ngay trong cùng chuỗi (ví dụ cụ thể, số liệu gợi ý, cách làm từng bước).",
 };
 
-/** Góc nhìn của dàn ý — quyết định giọng kể xuyên suốt bài viết sau này. */
-export type OutlinePerspective = "brand" | "personal" | "expert";
+/** Góc nhìn của dàn ý — quyết định giọng kể xuyên suốt bài viết sau này. "auto" để AI tự chọn. */
+export type OutlinePerspective = "auto" | "brand" | "personal" | "expert" | "advisor";
 
 export const OUTLINE_PERSPECTIVE_LABELS: Record<OutlinePerspective, string> = {
+  auto: "Giọng văn: AI tự quyết định",
   brand: "Giọng thương hiệu",
   personal: "Cá nhân trải nghiệm",
   expert: "Chuyên gia",
+  advisor: "Cố vấn di trú có giấy phép",
 };
 
 const OUTLINE_PERSPECTIVE_RULES: Record<OutlinePerspective, string> = {
+  auto: "Góc nhìn: bạn tự chọn góc nhìn/giọng kể phù hợp nhất với chủ đề và thương hiệu, giữ nhất quán xuyên suốt dàn ý.",
   brand: "", // mặc định — brandContext đã định giọng, không cần chỉ thị thêm
   personal:
     "Góc nhìn: MỘT CÁ NHÂN chia sẻ trải nghiệm thật — xưng \"mình\", kể chuyện đời thường, cảm xúc chân thật, có chi tiết cá nhân (lần đầu thử, sai lầm đã mắc, bài học rút ra).",
   expert:
     "Góc nhìn: CHUYÊN GIA trong ngành — giọng uy tín, phân tích có căn cứ, dẫn nguyên lý/số liệu/kinh nghiệm nghề, giải thích thuật ngữ dễ hiểu, đưa lời khuyên hành động được.",
+  advisor:
+    "Góc nhìn: CỐ VẤN DI TRÚ CÓ GIẤY PHÉP (licensed immigration adviser) — giọng chuyên nghiệp, chuẩn mực và đáng tin cậy; tư vấn dựa trên quy định/chính sách di trú hiện hành, thận trọng không hứa hẹn kết quả, nhấn mạnh tính tuân thủ pháp lý, giải thích thủ tục rõ ràng từng bước và khuyến nghị hành động cụ thể cho người có ý định di trú.",
 };
+
+/**
+ * Bộ nguyên tắc tuân thủ nội dung di trú MẶC ĐỊNH — người dùng có thể ghi đè
+ * tại Cài đặt → Thương hiệu (brand.immigrationRules). Chỉ chèn vào prompt khi
+ * chọn góc nhìn "Cố vấn di trú có giấy phép" (advisor).
+ */
+export const DEFAULT_IMMIGRATION_RULES = `- KHÔNG cam kết/đảm bảo kết quả visa hay hồ sơ (tuyệt đối tránh "bao đậu", "đậu 100%", "chắc chắn thành công").
+- Thông tin phải dựa trên quy định/chính sách di trú chính thức hiện hành; luôn khuyến nghị người đọc kiểm tra nguồn chính thức (website chính phủ/cơ quan di trú của nước liên quan) vì chính sách có thể thay đổi.
+- Nội dung mang tính thông tin chung, KHÔNG phải lời khuyên pháp lý cá nhân hóa; trường hợp cụ thể cần tư vấn trực tiếp với cố vấn di trú có giấy phép.
+- TUYỆT ĐỐI KHÔNG hướng dẫn hoặc gợi ý lách luật, khai gian, che giấu thông tin, làm giả giấy tờ hay bất kỳ hình thức gian lận hồ sơ nào.
+- Không tạo cảm giác khan hiếm/hối thúc sai lệch ("suất cuối", "chính sách sắp đóng cửa") khi không có căn cứ chính thức.
+- Chi phí và thời gian xử lý chỉ nêu dưới dạng khoảng ước tính, nói rõ là thay đổi tùy trường hợp và thời điểm.
+- Tôn trọng, không phân biệt đối xử theo quốc tịch, hoàn cảnh hay trình độ của người đọc.`;
+
+/** Khối nguyên tắc di trú hoàn chỉnh: ưu tiên bản người dùng config, trống → bộ mặc định. */
+function immigrationComplianceBlock(brand: BrandView): string {
+  const rules = brand.immigrationRules?.trim() || DEFAULT_IMMIGRATION_RULES;
+  return `NGUYÊN TẮC TUÂN THỦ NỘI DUNG DI TRÚ (bắt buộc áp dụng):\n${rules}`;
+}
 
 /**
  * Prompt triển khai 1 tiêu đề ý tưởng thành dàn ý (hook + ý chính + CTA).
@@ -195,18 +221,23 @@ export function outlinePrompt(
   perspective: OutlinePerspective = "brand",
 ): string {
   const perspectiveRule = OUTLINE_PERSPECTIVE_RULES[perspective];
+  // "auto" không có nhãn mô tả được — để AI tự chọn mức độ phù hợp.
+  const depthPhrase = depth === "auto" ? "phù hợp" : OUTLINE_DEPTH_LABELS[depth].toLowerCase();
+  // Giọng cố vấn di trú đi kèm bộ nguyên tắc tuân thủ riêng cho nội dung di trú.
+  const complianceBlock =
+    perspective === "advisor" ? `\n${immigrationComplianceBlock(brand)}\n` : "";
   return `Bạn là chuyên gia lên dàn ý nội dung mạng xã hội tiếng Việt.
 
 Ngữ cảnh thương hiệu:
 ${brandContext(brand)}
 
 Tiêu đề ý tưởng: "${ideaTitle}"
-${perspectiveRule ? `\n${perspectiveRule}\n` : ""}
-Hãy triển khai tiêu đề trên thành một dàn ý ${OUTLINE_DEPTH_LABELS[depth].toLowerCase()} cho bài đăng (dùng chung cho nhiều nền tảng):
+${perspectiveRule ? `\n${perspectiveRule}\n` : ""}${complianceBlock}
+Hãy triển khai tiêu đề trên thành một dàn ý ${depthPhrase} cho bài đăng (dùng chung cho nhiều nền tảng):
 - hook: một câu mở đầu thu hút mạnh.
 ${OUTLINE_DEPTH_RULES[depth]}
 - cta: một lời kêu gọi hành động phù hợp.
-Tất cả bằng tiếng Việt, bám sát thương hiệu${perspective !== "brand" ? " và giữ đúng góc nhìn đã nêu" : ""}.`;
+Tất cả bằng tiếng Việt, bám sát thương hiệu${perspectiveRule ? " và giữ đúng góc nhìn đã nêu" : ""}.`;
 }
 
 /**

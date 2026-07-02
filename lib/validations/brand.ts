@@ -13,6 +13,8 @@ export const brandSchema = z.object({
   guidelines: z.string().trim().default(""),
   // Nguyên tắc riêng cho prompt sinh ảnh Gemini (nhúng vào imagePromptPrompt).
   imagePromptRules: z.string().trim().default(""),
+  // Nguyên tắc tuân thủ nội dung di trú — chỉ nhúng khi chọn giọng văn Cố vấn di trú.
+  immigrationRules: z.string().trim().default(""),
   // pillars gửi từ form dưới dạng nhiều field cùng tên "pillar";
   // server gom thành mảng rồi loại phần tử rỗng.
   pillars: z.array(z.string().trim().min(1)).default([]),

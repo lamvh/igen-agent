@@ -58,7 +58,7 @@ npm run dev                  # http://localhost:3000
 | `npm run build` | Build production |
 | `npm run lint` | ESLint |
 | `npm run db:generate` | Sinh file migration từ `db/schema.ts` |
-| `npm run db:migrate` | Áp dụng migration → `local.db` |
+| `npm run db:migrate` | Áp dụng migration vào DB trong `.env.local` (`DATABASE_URL`, giống dev server); không có thì → `local.db` |
 
 > **Lưu ý:** Sau khi sửa `db/schema.ts`, chạy `db:generate` rồi `db:migrate`.
 
@@ -84,7 +84,7 @@ Sinh nội dung bằng Claude (`claude-opus-4-8`), dùng ngữ cảnh từ Brand
 - Output dùng **structured outputs** (zod) nên parse an toàn, không lo JSON hỏng.
 - **Không có `ANTHROPIC_API_KEY` vẫn dùng được đầy đủ**:
   - **Lưu ý tưởng thủ công** (chỉ cần tiêu đề, không gọi Claude).
-  - **Copy prompt** (ý tưởng / dàn ý / content) — sinh đúng prompt mà API dùng, không tốn token. Dàn ý có tùy chọn mức độ (Ngắn gọn / Tiêu chuẩn / Chuyên sâu) + góc nhìn (Giọng thương hiệu / Cá nhân trải nghiệm / Chuyên gia), áp dụng cho cả tạo bằng API lẫn copy prompt. Prompt content là brief đầy đủ nhất (ý tưởng + dàn ý + brand context + quy tắc nền tảng, độ dài tùy chọn) để dán sang Claude app hoặc AI agent bất kỳ triển khai thành bài hoàn chỉnh. Copy được ngay trong panel ý tưởng (chọn nền tảng + độ dài, không cần tạo post trước) hoặc trong editor của post.
+  - **Copy prompt** (ý tưởng / dàn ý / content) — sinh đúng prompt mà API dùng, không tốn token. Dàn ý có tùy chọn mức độ (AI tự quyết định / Ngắn gọn / Tiêu chuẩn / Chuyên sâu) + góc nhìn (AI tự quyết định / Giọng thương hiệu / Cá nhân trải nghiệm / Chuyên gia / Cố vấn di trú có giấy phép), mặc định cả hai là "AI tự quyết định"; áp dụng cho cả tạo bằng API lẫn copy prompt. Chọn góc nhìn Cố vấn di trú sẽ tự chèn thêm bộ **nguyên tắc tuân thủ nội dung di trú** vào prompt (không cam kết kết quả, không hướng dẫn gian lận hồ sơ, khuyến nghị kiểm tra nguồn chính thức…) — nội dung nguyên tắc sửa được tại **Cài đặt → Thương hiệu**, để trống sẽ dùng bộ mặc định. Prompt content là brief đầy đủ nhất (ý tưởng + dàn ý + brand context + quy tắc nền tảng, độ dài tùy chọn) để dán sang Claude app hoặc AI agent bất kỳ triển khai thành bài hoàn chỉnh. Copy được ngay trong panel ý tưởng (chọn nền tảng + độ dài, không cần tạo post trước) hoặc trong editor của post.
   - **Tạo nháp trống** cho 1 nền tảng → mở trình soạn, dán caption lấy từ Claude app rồi lưu như bình thường.
 
 ### Nội dung (`/posts`)

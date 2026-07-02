@@ -48,8 +48,8 @@ const TEXT_MAX = 200; // giới hạn độ dài ô target/tone để prompt kh�
 
 const IDEA_LENGTHS: IdeaLength[] = ["short", "medium", "long"];
 const CAPTION_LENGTHS: CaptionLength[] = ["xshort", "short", "medium", "long", "article"];
-const OUTLINE_DEPTHS: OutlineDepth[] = ["brief", "standard", "deep"];
-const OUTLINE_PERSPECTIVES: OutlinePerspective[] = ["brand", "personal", "expert"];
+const OUTLINE_DEPTHS: OutlineDepth[] = ["auto", "brief", "standard", "deep"];
+const OUTLINE_PERSPECTIVES: OutlinePerspective[] = ["auto", "brand", "personal", "expert", "advisor"];
 const IDEA_GOALS: IdeaGoal[] = ["engagement", "sales", "education", "awareness"];
 
 /** Ép kiểu platform an toàn từ input không tin cậy; mặc định facebook. */

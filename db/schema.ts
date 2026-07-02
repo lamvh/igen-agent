@@ -26,6 +26,9 @@ export const brand = sqliteTable("brand", {
   guidelines: text("guidelines").notNull().default(""),
   // Nguyên tắc riêng cho prompt sinh ảnh Gemini (nhúng vào imagePromptPrompt).
   imagePromptRules: text("image_prompt_rules").notNull().default(""),
+  // Nguyên tắc tuân thủ nội dung di trú — chỉ nhúng khi chọn giọng văn Cố vấn di trú.
+  // Trống → dùng bộ mặc định trong lib/ai/prompts.ts.
+  immigrationRules: text("immigration_rules").notNull().default(""),
   pillars: text("pillars").notNull().default("[]"), // JSON text: string[]
   // Danh sách tag định sẵn để phân loại ý tưởng (quản lý ở Brand Profile).
   tags: text("tags").notNull().default("[]"), // JSON text: string[]

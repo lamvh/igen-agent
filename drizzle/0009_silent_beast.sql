@@ -1,0 +1,1 @@
+ALTER TABLE `brand` ADD `immigration_rules` text DEFAULT '' NOT NULL;

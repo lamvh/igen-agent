@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { upsertBrand, type BrandFormState, type BrandView } from "@/app/actions/brand";
+import { DEFAULT_IMMIGRATION_RULES } from "@/lib/ai/prompts";
 
 const initialState: BrandFormState = { success: false, message: "", errors: {} };
 
@@ -92,6 +93,20 @@ export function BrandForm({ brand }: { brand: BrandView | null }) {
         />
         <p className="text-xs text-muted-foreground">
           Chỉ áp dụng riêng cho prompt sinh ảnh Gemini — nhúng vào mỗi lần tạo prompt ảnh.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="immigrationRules">Nguyên tắc tuân thủ nội dung di trú</Label>
+        <Textarea
+          id="immigrationRules"
+          name="immigrationRules"
+          rows={8}
+          defaultValue={brand?.immigrationRules || DEFAULT_IMMIGRATION_RULES}
+        />
+        <p className="text-xs text-muted-foreground">
+          Chỉ nhúng vào prompt khi tạo dàn ý với giọng văn <strong>Cố vấn di trú có giấy phép</strong>.
+          Xóa trống rồi lưu sẽ quay về bộ nguyên tắc mặc định.
         </p>
       </div>
 

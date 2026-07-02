@@ -64,6 +64,13 @@
       "when": 1782459387554,
       "tag": "0008_cooing_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1782994869982,
+      "tag": "0009_silent_beast",
+      "breakpoints": true
     }
   ]
 }
